@@ -1,0 +1,429 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+/* left version history sidebar*/
+.left-sidebar {
+  width: 280px;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-section {
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: #3b82f6;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+}
+
+.commit-input {
+  width: 100%;
+  padding: 10px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.commit-btn {
+  width: 100%;
+  padding: 10px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.commit-btn:hover {
+  background: #2563eb;
+}
+
+.version-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.version-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.version-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 32px;
+  bottom: -20px;
+  width: 2px;
+  background: #d1d5db;
+}
+
+.version-dot {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 2px solid #1f2937;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.version-dot-inner {
+  width: 12px;
+  height: 12px;
+  background: #1f2937;
+  border-radius: 50%;
+}
+
+.version-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.version-message {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.version-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* main content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* top bar nav */
+.top-nav {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.project-icon {
+  width: 40px;
+  height: 40px;
+  background: #fca5a5;
+  border-radius: 6px;
+}
+
+.project-name {
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
+}
+
+.language-select {
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.nav-right {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.icon-btn:hover {
+  background: #f3f4f6;
+}
+
+/* main edit section */
+.ai-prompt-section {
+  background: linear-gradient(135deg, #ffa4a4 0%, #badfdb 100%);
+  padding: 24px;
+}
+
+.ai-prompt-section.hidden {
+  display: none;
+}
+
+.prompt-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.prompt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: white;
+}
+
+.prompt-input-group {
+  display: flex;
+  gap: 12px;
+}
+
+.prompt-input {
+  flex: 1;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.generate-btn {
+  padding: 14px 24px;
+  background: white;
+  color: #d97d55;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+  font-size: 16px;
+}
+
+.generate-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-prompt-btn {
+  margin-top: 12px;
+  background: transparent;
+  color: white;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.show-prompt-btn {
+  background: #f2aebb;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  margin: 16px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.show-prompt-btn.hidden {
+  display: none;
+}
+
+/* edit area */
+.editor-container {
+  flex: 1;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.editor-wrapper {
+  height: 100%;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  overflow: hidden;
+}
+
+.line-numbers {
+  background: #f9fafb;
+  padding: 16px 12px;
+  text-align: right;
+  color: #9ca3af;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  line-height: 24px;
+  border-right: 1px solid #e5e7eb;
+  user-select: none;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.editor-textarea {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  line-height: 24px;
+  resize: none;
+  outline: none;
+}
+
+/* right collaborator sidebar */
+.right-sidebar {
+  width: 280px;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.collaborators-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.collaborator-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.collaborator-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  position: relative;
+}
+
+.online-indicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.collaborator-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.activity-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.activity-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-item {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+}
