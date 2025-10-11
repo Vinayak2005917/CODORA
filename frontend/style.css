@@ -200,7 +200,8 @@ body {
 }
 
 .icon-btn:hover {
-  background: #f3f4f6;
+  background: #3b82f6;
+  color: white;
 }
 
 /* main edit section */
@@ -333,7 +334,7 @@ body {
   outline: none;
 }
 
-/* right collaborator sidebar */
+/* right collab sidebar */
 .right-sidebar {
   width: 280px;
   background: white;
