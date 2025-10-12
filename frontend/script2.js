@@ -133,3 +133,38 @@ window.addEventListener('DOMContentLoaded', () => {
     renderCollaborators();
     enableCollaboratorClick();
 });
+
+
+
+const lineEl = document.getElementById("line");
+const editor = document.getElementById("editor");
+
+const socket = new WebSocket("ws://127.0.0.1:8000/ws/text/");
+
+socket.onopen = () => {
+  lineEl.textContent = "✅ Connected to backend!";
+  // ask for initial content
+  socket.send(JSON.stringify({ type: "request" }));
+};
+
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.text) {
+    lineEl.textContent = data.text.trim();
+  } else if (data.message) {
+    console.log("Server:", data.message);
+  }
+};
+
+socket.onclose = () => {
+  lineEl.textContent = "❌ Disconnected";
+};
+
+// When user types, send edit to backend (with debounce)
+let timeout;
+editor.addEventListener("input", () => {
+  clearTimeout(timeout);
+  timeout = setTimeout(() => {
+    socket.send(JSON.stringify({ type: "edit", text: editor.value }));
+  }, 300);
+});

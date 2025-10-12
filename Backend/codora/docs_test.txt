@@ -1,1 +1,0 @@
-This is the text from the text file in the backend. This file is stored in the backend and we want to edit this file from the front end. later on multiple users should be able to edit this file at the same time. A txt file is very easy to save in memory and move.
