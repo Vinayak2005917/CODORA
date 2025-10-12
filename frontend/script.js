@@ -46,7 +46,7 @@ const collaborators = [
   { id: 4, name: "AI", color: "#2563eb", emoji: "🤖", online: true },
 ];
 
-const initialContent = `// Welcome to AI Document Editor
+const initialContent = `// Welcome to Codora's AI Document Editor
 // Start by entering a prompt to generate content
 
 function example() {
