@@ -75,9 +75,8 @@
         const [text, setText] = useState("");
         const [connectedAt, setConnectedAt] = useState(null);
 
-  const host = location.hostname || '127.0.0.1';
-  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${scheme}://${host}:8000/ws/editor/`;
+  // Use deployed backend on Render
+  const wsUrl = 'wss://codora-vk5z.onrender.com/ws/editor/';
   const { ready, lastMessage, sendJson } = useWebSocket(wsUrl);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | ok | error
   const [saveMsg, setSaveMsg] = useState('');

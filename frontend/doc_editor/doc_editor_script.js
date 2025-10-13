@@ -142,10 +142,8 @@ const saveBtn = document.getElementById("saveBtn");
 const saveStatus = document.getElementById("saveStatus");
 const connStatus = document.getElementById("connStatus");
 
-// Pick host based on current page; default to localhost if opened as file://
-const host = location.hostname || "127.0.0.1";
-const scheme = location.protocol === "https:" ? "wss" : "ws";
-const wsUrl = `${scheme}://${host}:8000/ws/editor/`;
+// Use deployed backend on Render
+const wsUrl = 'wss://codora-vk5z.onrender.com/ws/editor/';
 
 const clientId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 let ws;
