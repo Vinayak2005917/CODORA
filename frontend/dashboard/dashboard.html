@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CODORA</title>
+    <link rel="stylesheet" href="dashboard_style.css">
+    <link rel="icon" type="image/x-icon" href="../Codoro_logo.png">
+</head>
+<body>
+    <div class="container">
+        <!-- header and avatar sextion -->
+        <div class="header">
+            <div class="user-avatar">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+        </div>
+
+        <!-- hero -->
+        <div class="hero">
+            <h1 class="logo">
+            <img src="../Codoro_logo.png" alt="CODORA Logo" class="logo" style="vertical-align: -15px; height: 1em;">
+            CODORA
+            </h1>
+            <p class="tagline"><span class="highlight-purple">Generate</span>, <span class="highlight-purple">Edit</span> and <span class="highlight-purple">Collaborate</span> Using the power of <span class="highlight-purple">AI</span></p>
+        </div>
+
+        <!-- prompt area -->
+        <div class="prompt-section">
+            <input 
+                type="text" 
+                class="prompt-input" 
+                placeholder="Start a new project or continue working..."
+                id="promptInput"
+            >
+            <div class="action-buttons">
+                <button class="btn-icon btn-document" title="Document Editor">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </button>
+                <button class="btn-icon btn-code" title="Code Editor">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                </button>
+                <button class="btn-icon btn-content" title="Content Generator">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="9" x2="15" y2="9"></line>
+                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                    </svg>
+                </button>
+                <button class="btn-go">Go!</button>
+            </div>
+        </div>
+
+        <!-- worskspace area -->
+        <div class="workspace">
+            <h2 class="workspace-title">Workspace</h2>
+            <div class="projects-grid" id="projectsGrid">
+                <!-- Hooked up entries -->
+                <a class="project-card" href="../code_editor/code_editor.html" data-key="code_editor">
+                    <div class="project-title">code_editor</div>
+                    <div class="project-desc">Collaborative code editing</div>
+                </a>
+                <a class="project-card" href="../doc_editor/doc_editor.html" data-key="doc_editor">
+                    <div class="project-title">doc_editor</div>
+                    <div class="project-desc">Real-time document editor</div>
+                </a>
+                <a class="project-card" href="#lesson_planner" data-key="lesson_planner">
+                    <div class="project-title">lesson_planner</div>
+                    <div class="project-desc">Plan and generate lessons</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard_script.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Document Editor</title>
+    <link rel="stylesheet" href="doc_editor_style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- left sidebar -->
+        <div class="sidebar">
+            <div class="user-section">
+                <div class="user-profile">
+                    <div class="user-avatar">👤</div>
+                    <span style="font-weight: 600;">User's Name</span>
+                </div>
+                <input type="text" class="commit-input" placeholder="Commit Message here..." id="commitMessage">
+                <button class="commit-btn">commit</button>
+            </div>
+
+            <div class="timeline" id="versionHistory"></div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="toolbar">
+                <div class="project-title">Project name/title</div>
+                <div class="toolbar-actions">
+                    <div class="zoom-control">
+                        <button class="toolbar-btn">-</button>
+                        <span style="font-weight: 600;">100%</span>
+                        <button class="toolbar-btn">+</button>
+                    </div>
+                    <button class="toolbar-btn"><strong>B</strong></button>
+                    <button class="toolbar-btn"><strong><u>U</u></strong></button>
+                    <button class="toolbar-btn">File ▼</button>
+                    <button class="toolbar-btn">Edit ▼</button>
+                    <button class="toolbar-btn">View ▼</button>
+                    <button class="toolbar-btn">Insert ▼</button>
+                    <button class="toolbar-btn" id="saveBtn">Save</button>
+                    <span id="connStatus" style="font-size:12px;margin-left:8px;color:#6b7280"></span>
+                    <span id="saveStatus" style="font-size:12px;margin-left:8px;color:#6b7280"></span>
+                </div>
+            </div>
+
+            <div class="editor-container">
+                <div class="document" id="document" contenteditable="true">
+                    <div class="doc-content">
+                        <p>Start typing here… this whole document area syncs live.</p>
+                        <p>You can open this page in two windows to test collaboration.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- right sidebar -->
+        <div class="right-sidebar">
+            <h3 class="collaborators-title">Collaborators:</h3>
+            <div id="collaboratorsList"></div>
+
+            <div class="activity-section">
+                <h4 class="activity-title">
+                    <span>🕐</span>
+                    Recent Activity
+                </h4>
+                <div class="activity-item">
+                    <span>🔀</span>
+                    <span>User 1 committed changes</span>
+                </div>
+                <div class="activity-item">
+                    <span>📄</span>
+                    <span>AI generated new content</span>
+                </div>
+                <div class="activity-item">
+                    <span>👤</span>
+                    <span>User 2 joined session</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="doc_editor_script.js"></script>
+</body>
+
+</html>
