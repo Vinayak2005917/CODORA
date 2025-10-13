@@ -24,7 +24,7 @@ body {
 
 /* sidebar */
 .sidebar {
-  width: 280px;
+  width: 200px;
   background: white;
   border-right: 1px solid #e0e0e0;
   display: flex;
@@ -225,12 +225,12 @@ body {
 }
 
 .document {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   background: white;
   padding: 60px 80px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  min-height: 100%;
+  min-height: 110%;
   border-radius: 8px;
 }
 
@@ -264,7 +264,7 @@ body {
 .doc-content {
   line-height: 1.8;
   color: #34495e;
-  font-size: 15px;
+  font-size: 20px;
 }
 
 .doc-content p {
@@ -282,7 +282,7 @@ body {
 
 /* right collab sidebar */
 .right-sidebar {
-  width: 280px;
+  width: 200px;
   background: white;
   border-left: 1px solid #e5e7eb;
   padding: 24px;
