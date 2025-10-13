@@ -56,6 +56,11 @@ function renderProjects() {
     const grid = document.getElementById('projectsGrid');
     if (!grid) return;
 
+    // If static anchors already exist (your clickable cards), don't overwrite them.
+    if (grid.querySelector('a.project-card')) {
+        return;
+    }
+
     grid.innerHTML = projects.map(project => `
         <div class="project-card" onclick="openProject(${project.id})">
             <div class="copy-icon" onclick="event.stopPropagation(); copyProject(${project.id})">

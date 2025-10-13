@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; url=dashboard/dashboard.html" />
+    <title>Redirecting…</title>
+    <script>
+      // JS fallback for older browsers or if meta refresh is blocked
+      (function(){
+        var target = 'dashboard/dashboard.html';
+        if (window.location.pathname.endsWith('/')) {
+          window.location.replace(target);
+        } else {
+          // Ensure we resolve relative to current folder
+          window.location.replace(target);
+        }
+      })();
+    </script>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+      .msg { color:#444; }
+      a { color:#2563eb; text-decoration:none; }
+    </style>
+  </head>
+  <body>
+    <div class="msg">Redirecting to dashboard… <a href="dashboard/dashboard.html">Click here if not redirected</a>.</div>
+  </body>
+</html>

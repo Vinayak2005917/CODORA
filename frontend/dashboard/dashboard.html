@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CODORA - AI Suite</title>
-    <link rel="stylesheet" href="dashboard_style1.css">
+    <link rel="stylesheet" href="dashboard_style.css">
 </head>
 <body>
     <div class="container">
@@ -63,10 +63,23 @@
         <div class="workspace">
             <h2 class="workspace-title">Workspace</h2>
             <div class="projects-grid" id="projectsGrid">
+                <!-- Hooked up entries -->
+                <a class="project-card" href="../code_editor/code_editor.html" data-key="code_editor">
+                    <div class="project-title">code_editor</div>
+                    <div class="project-desc">Collaborative code editing</div>
+                </a>
+                <a class="project-card" href="../doc_editor/doc_editor.html" data-key="doc_editor">
+                    <div class="project-title">doc_editor</div>
+                    <div class="project-desc">Real-time document editor</div>
+                </a>
+                <a class="project-card" href="#lesson_planner" data-key="lesson_planner">
+                    <div class="project-title">lesson_planner</div>
+                    <div class="project-desc">Plan and generate lessons</div>
+                </a>
             </div>
         </div>
     </div>
 
-    <script src="dashboard_script1.js"></script>
+    <script src="dashboard_script.js"></script>
 </body>
 </html>
