@@ -41,6 +41,8 @@ body {
   color: white;
   cursor: pointer;
   transition: transform 0.2s;
+  margin-right: 50px;
+
 }
 
 .user-avatar:hover {
@@ -165,7 +167,7 @@ body {
   opacity: 0.9;
 }
 
-/* workspace arwa */
+/* workspace area */
 .workspace {
   margin-top: 60px;
 }
