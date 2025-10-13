@@ -182,8 +182,8 @@ const saveBtn = document.getElementById("saveBtn");
 const saveStatus = document.getElementById("saveStatus");
 const connStatus = document.getElementById("connStatus");
 
-// Use deployed backend on Render
-const wsUrl = "wss://codora-vk5z.onrender.com/ws/editor/";
+// Use local backend during development
+const wsUrl = "ws://127.0.0.1:8000/ws/editor/";
 
 const clientId =
   typeof crypto !== "undefined" && crypto.randomUUID

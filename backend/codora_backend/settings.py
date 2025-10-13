@@ -134,9 +134,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ALLOWED_HOSTS = ["*"]
 
 CORS_ALLOWED_ORIGINS = [
-    "https://your-vercel-frontend.vercel.app",
+    "https://vercel.com/vinayak2005917s-projects/codora/5eAEn5wbZv8Fr2rdEGDCGLQVgmZn",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://your-vercel-frontend.vercel.app",
+    "https://vercel.com/vinayak2005917s-projects/codora/5eAEn5wbZv8Fr2rdEGDCGLQVgmZn",
 ]
