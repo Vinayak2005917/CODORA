@@ -40,16 +40,17 @@
                     <button class="toolbar-btn">Edit ▼</button>
                     <button class="toolbar-btn">View ▼</button>
                     <button class="toolbar-btn">Insert ▼</button>
+                    <button class="toolbar-btn" id="saveBtn">Save</button>
+                    <span id="connStatus" style="font-size:12px;margin-left:8px;color:#6b7280"></span>
+                    <span id="saveStatus" style="font-size:12px;margin-left:8px;color:#6b7280"></span>
                 </div>
             </div>
 
             <div class="editor-container">
-                <div class="document" contenteditable="true">
-
+                <div class="document" id="document" contenteditable="true">
                     <div class="doc-content">
-                        <p id="line">Didn't work</p>
-                        <textarea id="editor" rows="5" cols="40" placeholder="Type to edit..."></textarea>
-                        
+                        <p>Start typing here… this whole document area syncs live.</p>
+                        <p>You can open this page in two windows to test collaboration.</p>
                     </div>
                 </div>
             </div>

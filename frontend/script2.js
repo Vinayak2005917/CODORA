@@ -136,35 +136,84 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 
-const lineEl = document.getElementById("line");
-const editor = document.getElementById("editor");
+// --- Collaborative editor wiring (Channels /ws/editor/) ---
+const editor = document.getElementById("document");
+const saveBtn = document.getElementById("saveBtn");
+const saveStatus = document.getElementById("saveStatus");
+const connStatus = document.getElementById("connStatus");
 
-const socket = new WebSocket("ws://127.0.0.1:8000/ws/text/");
+// Pick host based on current page; default to localhost if opened as file://
+const host = location.hostname || "127.0.0.1";
+const scheme = location.protocol === "https:" ? "wss" : "ws";
+const wsUrl = `${scheme}://${host}:8000/ws/editor/`;
 
-socket.onopen = () => {
-  lineEl.textContent = "✅ Connected to backend!";
-  // ask for initial content
-  socket.send(JSON.stringify({ type: "request" }));
-};
+const clientId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+let ws;
 
-socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.text) {
-    lineEl.textContent = data.text.trim();
-  } else if (data.message) {
-    console.log("Server:", data.message);
-  }
-};
+function connect() {
+  ws = new WebSocket(wsUrl);
 
-socket.onclose = () => {
-  lineEl.textContent = "❌ Disconnected";
-};
+  ws.onopen = () => {
+    if (connStatus) {
+      connStatus.textContent = "Connected";
+      connStatus.style.color = "#16a34a";
+    }
+    // On connect, server will send latest content automatically
+  };
 
-// When user types, send edit to backend (with debounce)
-let timeout;
+  ws.onclose = () => {
+    if (connStatus) {
+      connStatus.textContent = "Disconnected";
+      connStatus.style.color = "#dc2626";
+    }
+    // Optional: reconnect after delay
+    setTimeout(connect, 1500);
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === "edit") {
+        // Update contenteditable only if content changed to avoid flicker
+        if (editor.innerHTML !== data.content) {
+          editor.innerHTML = data.content;
+        }
+      }
+      if (data.type === "saved") {
+        if (data.ok) {
+          saveStatus.textContent = `Saved to ${data.path}`;
+          saveStatus.style.color = '#16a34a';
+        } else {
+          saveStatus.textContent = `Save error: ${data.error}`;
+          saveStatus.style.color = '#dc2626';
+        }
+        setTimeout(() => { saveStatus.textContent = ""; }, 2000);
+      }
+    } catch (e) {
+      console.warn("WS message parse error", e);
+    }
+  };
+}
+
+connect();
+
+// Debounced send of edits
+let editTimeout;
 editor.addEventListener("input", () => {
-  clearTimeout(timeout);
-  timeout = setTimeout(() => {
-    socket.send(JSON.stringify({ type: "edit", text: editor.value }));
-  }, 300);
+  clearTimeout(editTimeout);
+  editTimeout = setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "edit", content: editor.innerHTML, clientId }));
+    }
+  }, 200);
 });
+
+// Save button
+if (saveBtn) {
+  saveBtn.addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    saveStatus.textContent = "Saving...";
+    saveStatus.style.color = '#6b7280';
+    ws.send(JSON.stringify({ type: "save", content: editor.innerHTML, clientId }));
+  });
+}
