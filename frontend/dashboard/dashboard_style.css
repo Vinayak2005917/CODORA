@@ -75,17 +75,17 @@ body {
 
 /* prompt area */
 .prompt-section {
-  background: linear-gradient(135deg, #ffa4a4 0%, #badfdb 100%);
-  background-size: 100% 100%;
-  animation: gradientAnimation 6s ease-in-out infinite;
-  padding: 18px;
+  /* Shadowed container that includes input + action buttons */
+  background: #1f1f1f;
+  padding: 14px 16px;
   border-radius: 12px;
   margin-bottom: 80px;
   margin-top: 80px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
+  flex-wrap: wrap; /* stack on smaller screens */
 }
 
 @keyframes gradientAnimation {
@@ -104,15 +104,24 @@ body {
   flex: 1;
   padding: 18px 24px;
   font-size: 18px;
-  border: none;
+  border: 0px solid #1f2937; /* subtle border for contrast */
   border-radius: 8px;
-  background: #2a2a2a;
+  background: #1f1f1f;
   color: white;
   outline: none;
+  box-shadow: none; /* shadow is on the outer prompt-section now */
 }
 
 .prompt-input::placeholder {
   color: #999;
+}
+
+
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .action-buttons {
@@ -123,7 +132,7 @@ body {
 
 .btn-go {
   padding: 15px 40px;
-  background: #00d26a;
+  background: #00b003;
   color: white;
   border: none;
   border-radius: 8px;
@@ -134,7 +143,7 @@ body {
 }
 
 .btn-go:hover {
-  background: #00b85c;
+  background: #00c903;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 210, 106, 0.4);
 }
