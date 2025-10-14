@@ -25,13 +25,27 @@ class EditorConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
+        # Load content from test.txt if available, otherwise use in-memory content
+        content_to_send = EditorConsumer.latest_content
+        test_file_path = settings.BASE_DIR / "test.txt"
+        
+        try:
+            if test_file_path.exists():
+                async with aiofiles.open(test_file_path, mode="r", encoding="utf-8") as f:
+                    file_content = await f.read()
+                    if file_content:  # If file has content, use it
+                        content_to_send = file_content
+                        EditorConsumer.latest_content = file_content  # Update in-memory cache
+        except Exception:
+            pass  # Fall back to in-memory content
+
         # Send initial state to the just-connected client
-        if EditorConsumer.latest_content is not None:
+        if content_to_send is not None:
             await self.send(
                 text_data=json.dumps(
                     {
                         "type": "edit",
-                        "content": EditorConsumer.latest_content,
+                        "content": content_to_send,
                         "clientId": None,
                     }
                 )
@@ -101,11 +115,15 @@ class EditorConsumer(AsyncWebsocketConsumer):
         return
 
     async def editor_message(self, event):
+        content = event.get("content", "")
+        # Update latest_content when broadcasting
+        EditorConsumer.latest_content = content
+        
         await self.send(
             text_data=json.dumps(
                 {
                     "type": "edit",
-                    "content": event.get("content", ""),
+                    "content": content,
                     "clientId": event.get("clientId"),
                 }
             )

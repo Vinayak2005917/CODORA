@@ -7,6 +7,11 @@
     <title>Document Editor | CODORA </title>
     <link rel="stylesheet" href="doc_editor_style.css">
     <link rel="icon" type="image/x-icon" href="../Codoro_logo.png">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 
 <body>
@@ -15,8 +20,8 @@
         <div class="sidebar">
             <div class="user-section">
                 <div class="user-profile">
-                    <div class="user-avatar"><img src="../Codoro_logo.png" alt="Codora Fox Logo"></div>
-                    <span style="font-weight: 700; font-size: 27px; letter-spacing: 1px;">CODORA</span>
+                    <div class="user-avatar"><a href="../dashboard/dashboard.html"><img src="../Codoro_logo.png" alt="Codora Fox Logo"></a></div>
+                    <span style="font-weight: 700; font-size: 27px; letter-spacing: 1px;" href="../dashboard/dashboard.html">CODORA</span>
                 </div>
                 <input type="text" class="commit-input" placeholder="Commit Message here..." id="commitMessage">
                 <button class="commit-btn">commit</button>
@@ -48,11 +53,7 @@
             </div>
 
             <div class="editor-container">
-                <div class="document" id="document" contenteditable="true">
-                    <div class="doc-content">
-                        <p></p>
-                    </div>
-                </div>
+                <div class="document" id="document" contenteditable="true"></div>
             </div>
         </div>
 

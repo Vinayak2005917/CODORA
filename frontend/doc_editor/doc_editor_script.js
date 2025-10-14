@@ -219,10 +219,50 @@ function connect() {
     try {
       const data = JSON.parse(event.data);
       if (data.type === "edit") {
-        // Update contenteditable only if content changed to avoid flicker
-        if (editor.innerHTML !== data.content) {
-          editor.innerHTML = data.content;
+        let content = String(data.content ?? "");
+
+        // If server sent full HTML (starts with <html or <div etc.), just drop it in.
+        const looksHtml = /^\s*<[^>]+>/.test(content);
+
+        if (!looksHtml && typeof marked !== "undefined") {
+          // Unwrap top-level fenced code blocks if the whole payload is fenced
+          // ```lang\n...\n```
+          const fencedBlock = /^\s*```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```\s*$/.exec(content);
+          if (fencedBlock) {
+            content = fencedBlock[1];
+          }
+
+          // Configure marked once
+          marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: true,
+            mangle: false
+          });
+
+          try {
+            content = marked.parse(content);
+          } catch (e) {
+            console.warn("Markdown parse failed, falling back to plain text", e);
+            content = content
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/\n/g, "<br>");
+          }
+
+          // Syntax highlight after DOM update
+          setTimeout(() => {
+            if (typeof hljs !== "undefined") {
+              document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+              });
+            }
+          }, 50);
         }
+
+        // Update editor HTML only if changed
+        if (editor.innerHTML !== content) editor.innerHTML = content;
       }
       if (data.type === "saved") {
         if (data.ok) {
