@@ -182,8 +182,22 @@ const saveBtn = document.getElementById("saveBtn");
 const saveStatus = document.getElementById("saveStatus");
 const connStatus = document.getElementById("connStatus");
 
-// Use local backend during development
-const wsUrl = "ws://127.0.0.1:8000/ws/editor/";
+// Parse room number from URL parameter
+const urlParams = new URLSearchParams(window.location.search);
+const room = urlParams.get('room') || 'default';
+
+// Update project title with room number
+const projectTitle = document.querySelector('.project-title');
+if (projectTitle && room !== 'default') {
+  projectTitle.textContent = `Project Room: ${room}`;
+}
+
+// Build WebSocket URL with room parameter
+const wsUrl = room === 'default' 
+  ? "ws://127.0.0.1:8000/ws/editor/"
+  : `ws://127.0.0.1:8000/ws/editor/${room}/`;
+
+console.log('Connecting to room:', room, 'via', wsUrl);
 
 const clientId =
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -276,10 +290,56 @@ function connect() {
           saveStatus.textContent = "";
         }, 2000);
       }
+      if (data.type === "users_list" || data.type === "user_joined" || data.type === "user_left") {
+        updateCollaboratorsList(data.users);
+        
+        if (data.type === "user_joined") {
+          showNotification(`${data.user.username} joined`, "success");
+        } else if (data.type === "user_left") {
+          showNotification(`${data.user.username} left`, "info");
+        }
+      }
     } catch (e) {
       console.warn("WS message parse error", e);
     }
   };
+}
+
+function updateCollaboratorsList(users) {
+  const collabsList = document.getElementById('collaboratorsList');
+  if (!collabsList || !users) return;
+  
+  collabsList.innerHTML = users.map(user => `
+    <div style="display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; background: #f3f4f6; margin-bottom: 8px;">
+      <div style="width: 36px; height: 36px; border-radius: 50%; background: ${user.avatarColor}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+        ${user.username.charAt(0).toUpperCase()}
+      </div>
+      <span style="font-weight: 500; font-size: 14px;">${user.username}</span>
+    </div>
+  `).join('');
+}
+
+function showNotification(message, type = "info") {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    background: ${type === 'success' ? '#10b981' : '#3b82f6'};
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+  `;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
 connect();
