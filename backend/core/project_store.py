@@ -1,0 +1,218 @@
+"""
+Project storage utilities for CODORA.
+Manages filesystem-based project storage with room numbers.
+"""
+import json
+import os
+import random
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Dict, List
+from django.conf import settings
+
+
+class ProjectStore:
+    """Handles project creation, retrieval, and management."""
+    
+    def __init__(self):
+        self.projects_root = settings.BASE_DIR / "projects"
+        self.projects_root.mkdir(exist_ok=True)
+    
+    def generate_room(self) -> str:
+        """Generate a unique 6-digit room number."""
+        max_attempts = 100
+        for _ in range(max_attempts):
+            room = str(random.randint(100000, 999999))
+            if not self.room_exists(room):
+                return room
+        raise RuntimeError("Failed to generate unique room number")
+    
+    def room_exists(self, room: str) -> bool:
+        """Check if a room already exists."""
+        room_path = self.projects_root / room
+        return room_path.exists()
+    
+    def get_project_path(self, room: str) -> Path:
+        """Get the path to a project's directory."""
+        return self.projects_root / room
+    
+    def extract_preview(self, content: str, max_length: int = 300) -> str:
+        """Extract a preview from content (first few lines/chars)."""
+        # Remove markdown formatting for preview
+        preview = content.replace('#', '').replace('*', '').replace('`', '')
+        lines = preview.split('\n')
+        preview_text = ' '.join(line.strip() for line in lines if line.strip())
+        
+        if len(preview_text) > max_length:
+            preview_text = preview_text[:max_length] + "..."
+        
+        return preview_text
+    
+    def get_content_filename(self, project_type: str) -> str:
+        """Get the appropriate content filename based on project type."""
+        return {
+            'doc': 'content.md',
+            'code': 'main.txt',
+            'lesson': 'lesson.md'
+        }.get(project_type, 'content.txt')
+    
+    def create_project(self, project_type: str, prompt: str, content: str, title: Optional[str] = None) -> Dict:
+        """
+        Create a new project with a unique room number.
+        
+        Args:
+            project_type: 'doc', 'code', or 'lesson'
+            prompt: Original user prompt
+            content: AI-generated or initial content
+            title: Optional title (defaults to first line of content or prompt)
+        
+        Returns:
+            Dict with room, path, type, and other metadata
+        """
+        room = self.generate_room()
+        room_path = self.get_project_path(room)
+        room_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate title if not provided
+        if not title:
+            # Try to extract from content (first line without markdown)
+            first_line = content.split('\n')[0].strip()
+            title = first_line.replace('#', '').strip()[:50]
+            if not title:
+                title = prompt[:50] if prompt else f"Project {room}"
+        
+        # Create metadata
+        now = datetime.utcnow().isoformat()
+        meta = {
+            'room': room,
+            'type': project_type,
+            'title': title,
+            'prompt': prompt,
+            'created_at': now,
+            'updated_at': now,
+            'preview': self.extract_preview(content)
+        }
+        
+        # Save metadata
+        meta_path = room_path / 'meta.json'
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        
+        # Save content
+        content_filename = self.get_content_filename(project_type)
+        content_path = room_path / content_filename
+        with open(content_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return {
+            'room': room,
+            'type': project_type,
+            'title': title,
+            'path': str(room_path),
+            'created_at': now,
+            'updated_at': now
+        }
+    
+    def get_project(self, room: str) -> Optional[Dict]:
+        """
+        Get a project's metadata and content.
+        
+        Returns:
+            Dict with metadata and content, or None if not found
+        """
+        room_path = self.get_project_path(room)
+        if not room_path.exists():
+            return None
+        
+        meta_path = room_path / 'meta.json'
+        if not meta_path.exists():
+            return None
+        
+        # Load metadata
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        
+        # Load content
+        content_filename = self.get_content_filename(meta.get('type', 'doc'))
+        content_path = room_path / content_filename
+        
+        content = ""
+        if content_path.exists():
+            with open(content_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        
+        return {
+            **meta,
+            'content': content
+        }
+    
+    def list_projects(self) -> List[Dict]:
+        """
+        List all projects.
+        
+        Returns:
+            List of project metadata dicts (without full content)
+        """
+        projects = []
+        
+        if not self.projects_root.exists():
+            return projects
+        
+        for room_dir in self.projects_root.iterdir():
+            if not room_dir.is_dir():
+                continue
+            
+            meta_path = room_dir / 'meta.json'
+            if not meta_path.exists():
+                continue
+            
+            try:
+                with open(meta_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                    projects.append(meta)
+            except (json.JSONDecodeError, IOError):
+                continue
+        
+        # Sort by updated_at descending (most recent first)
+        projects.sort(key=lambda p: p.get('updated_at', ''), reverse=True)
+        
+        return projects
+    
+    def save_content(self, room: str, content: str) -> bool:
+        """
+        Save content to a project.
+        
+        Returns:
+            True if successful, False if project doesn't exist
+        """
+        room_path = self.get_project_path(room)
+        if not room_path.exists():
+            return False
+        
+        meta_path = room_path / 'meta.json'
+        if not meta_path.exists():
+            return False
+        
+        # Load metadata to get type
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        
+        # Save content
+        content_filename = self.get_content_filename(meta.get('type', 'doc'))
+        content_path = room_path / content_filename
+        
+        with open(content_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        # Update metadata timestamp and preview
+        meta['updated_at'] = datetime.utcnow().isoformat()
+        meta['preview'] = self.extract_preview(content)
+        
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        
+        return True
+
+
+# Singleton instance
+project_store = ProjectStore()

@@ -2,14 +2,216 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 import json
 from openai import OpenAI
 from django.conf import settings
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import os
+from .project_store import project_store
+from .models import User
 
 # Create your views here.
+
+# ===== USER AUTHENTICATION VIEWS =====
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def signup_view(request):
+    """
+    Create a new user account.
+    
+    Request: { "username": "...", "email": "...", "password": "..." }
+    Response: { "ok": true, "user": { "id": 1, "username": "...", "email": "..." } }
+    """
+    try:
+        data = json.loads(request.body)
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+        
+        # Validation
+        if not username or len(username) < 3:
+            return JsonResponse({'error': 'Username must be at least 3 characters'}, status=400)
+        
+        if not email:
+            return JsonResponse({'error': 'Email is required'}, status=400)
+        
+        if not password or len(password) < 6:
+            return JsonResponse({'error': 'Password must be at least 6 characters'}, status=400)
+        
+        # Check if username already exists
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({'error': 'Username already taken'}, status=400)
+        
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'Email already registered'}, status=400)
+        
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password
+        )
+        
+        # Log the user in
+        login(request, user)
+        
+        return JsonResponse({
+            'ok': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'avatarColor': user.avatar_color
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        print(f"Signup error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def login_view(request):
+    """
+    Log in an existing user OR auto-register if doesn't exist.
+    
+    Request: { "username": "...", "password": "..." }
+    Response: { "ok": true, "user": { "id": 1, "username": "...", "email": "..." }, "created": boolean }
+    """
+    try:
+        data = json.loads(request.body)
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        if not username or not password:
+            return JsonResponse({'error': 'Username and password are required'}, status=400)
+        
+        if len(username) < 3:
+            return JsonResponse({'error': 'Username must be at least 3 characters'}, status=400)
+        
+        if len(password) < 6:
+            return JsonResponse({'error': 'Password must be at least 6 characters'}, status=400)
+        
+        # Try to authenticate existing user
+        user = authenticate(request, username=username, password=password)
+        created = False
+        
+        if user is None:
+            # User doesn't exist or wrong password - check if user exists
+            if User.objects.filter(username=username).exists():
+                return JsonResponse({'error': 'Invalid password'}, status=401)
+            
+            # User doesn't exist - auto-register
+            import random
+            user = User.objects.create_user(
+                username=username,
+                email=f"{username}@codora.local",  # Auto-generate email
+                password=password
+            )
+            # Assign random avatar color
+            colors = ['#5eb3f6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899']
+            user.avatar_color = random.choice(colors)
+            user.save()
+            created = True
+        
+        # Log the user in
+        login(request, user)
+        
+        return JsonResponse({
+            'ok': True,
+            'created': created,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'avatarColor': user.avatar_color
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def logout_view(request):
+    """
+    Log out the current user.
+    
+    Response: { "ok": true }
+    """
+    logout(request)
+    return JsonResponse({'ok': True})
+
+
+@require_http_methods(["GET"])
+def me_view(request):
+    """
+    Get the currently logged-in user.
+    
+    Response: { "ok": true, "user": { "id": 1, "username": "...", ... } } or { "ok": false }
+    """
+    if request.user.is_authenticated:
+        return JsonResponse({
+            'ok': True,
+            'authenticated': True,
+            'user': {
+                'id': request.user.id,
+                'username': request.user.username,
+                'email': request.user.email,
+                'avatarColor': request.user.avatar_color
+            }
+        })
+    else:
+        return JsonResponse({
+            'ok': False,
+            'authenticated': False
+        })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def guest_login_view(request):
+    """
+    Create a temporary guest user session.
+    
+    Response: { "ok": true, "user": { "username": "Guest1234", ... } }
+    """
+    import random
+    
+    # Generate guest username
+    guest_num = random.randint(1000, 9999)
+    guest_username = f"Guest{guest_num}"
+    
+    # Store guest info in session (not in database)
+    request.session['is_guest'] = True
+    request.session['guest_username'] = guest_username
+    request.session['guest_avatar_color'] = '#6b7280'
+    
+    return JsonResponse({
+        'ok': True,
+        'guest': True,
+        'user': {
+            'id': f'guest_{guest_num}',
+            'username': guest_username,
+            'email': f'{guest_username}@guest.local',
+            'avatarColor': '#6b7280'
+        }
+    })
+
+
+# ===== AI AND PROJECT VIEWS =====
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -26,31 +228,37 @@ def process_prompt(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
+        api_key = "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"
+        print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key="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",
+            api_key=api_key,
         )
         
         # Get AI response with Markdown formatting instruction
-        completion = client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": "https://codora.app",
-                "X-Title": "CODORA",
-            },
-            model="google/gemma-3n-e4b-it:free",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful AI assistant. Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate."
+        try:
+            completion = client.chat.completions.create(
+                extra_headers={
+                    "HTTP-Referer": "https://codora.app",
+                    "X-Title": "CODORA",
                 },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-        
-        ai_response = completion.choices[0].message.content
+                extra_body={},
+                model="nvidia/nemotron-nano-9b-v2:free",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful AI assistant. Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            ai_response = completion.choices[0].message.content
+        except Exception as api_error:
+            print(f"DEBUG: API Error: {str(api_error)}")
+            return JsonResponse({'error': f'API Error: {str(api_error)}'}, status=500)
         
         # Save to test.txt
         test_file_path = settings.BASE_DIR / "test.txt"
@@ -76,5 +284,158 @@ def process_prompt(request):
         
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_project(request):
+    """
+    Create a new project with AI-generated content.
+    
+    Request: { "type": "doc"|"code"|"lesson", "prompt": "..." }
+    Response: { "ok": true, "room": "123456", "type": "doc", "redirect": "/frontend/doc_editor/doc_editor.html?room=123456" }
+    """
+    try:
+        data = json.loads(request.body)
+        project_type = data.get('type', '').strip()
+        prompt = data.get('prompt', '').strip()
+        
+        if not project_type or project_type not in ['doc', 'code', 'lesson']:
+            return JsonResponse({'error': 'Valid type (doc/code/lesson) is required'}, status=400)
+        
+        if not prompt:
+            return JsonResponse({'error': 'Prompt is required'}, status=400)
+        
+        # Initialize OpenAI client with OpenRouter
+        api_key = "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"
+        print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+        
+        # Generate AI content with Markdown formatting
+        try:
+            completion = client.chat.completions.create(
+                extra_headers={
+                    "HTTP-Referer": "https://codora.app",
+                    "X-Title": "CODORA",
+                },
+                extra_body={},
+                model="nvidia/nemotron-nano-9b-v2:free",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful AI assistant. Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            ai_response = completion.choices[0].message.content
+        except Exception as api_error:
+            print(f"DEBUG: API Error: {str(api_error)}")
+            return JsonResponse({'error': f'API Error: {str(api_error)}'}, status=500)
+        
+        # Create project
+        project = project_store.create_project(
+            project_type=project_type,
+            prompt=prompt,
+            content=ai_response
+        )
+        
+        # Determine redirect URL based on type
+        editor_map = {
+            'doc': '/frontend/doc_editor/doc_editor.html',
+            'code': '/frontend/code_editor/code_editor.html',
+            'lesson': '/frontend/lesson_planner/lesson_planner.html'
+        }
+        
+        redirect_url = f"{editor_map[project_type]}?room={project['room']}"
+        
+        # Broadcast to the new room (for any already-connected clients)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"editor_{project['room']}",
+            {
+                "type": "editor.message",
+                "content": ai_response,
+                "clientId": "AI_SYSTEM"
+            }
+        )
+        
+        return JsonResponse({
+            'ok': True,
+            'success': True,  # For backward compatibility
+            'room': project['room'],
+            'type': project_type,
+            'title': project['title'],
+            'redirect': redirect_url,
+            'response': ai_response  # For backward compatibility
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def list_projects(request):
+    """
+    List all projects.
+    
+    Response: [{ "room": "123456", "type": "doc", "title": "...", "updatedAt": "...", "preview": "..." }]
+    """
+    try:
+        projects = project_store.list_projects()
+        
+        # Convert to camelCase for frontend
+        response_projects = []
+        for project in projects:
+            response_projects.append({
+                'room': project['room'],
+                'type': project['type'],
+                'title': project['title'],
+                'createdAt': project['created_at'],
+                'updatedAt': project['updated_at'],
+                'preview': project['preview']
+            })
+        
+        return JsonResponse(response_projects, safe=False)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def get_project(request, room):
+    """
+    Get a specific project by room number.
+    
+    Response: { "ok": true, "room": "123456", "type": "doc", "title": "...", "content": "...", ... }
+    """
+    try:
+        project = project_store.get_project(room)
+        
+        if not project:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+        
+        # Convert to camelCase for frontend
+        return JsonResponse({
+            'ok': True,
+            'room': project['room'],
+            'type': project['type'],
+            'title': project['title'],
+            'createdAt': project['created_at'],
+            'updatedAt': project['updated_at'],
+            'preview': project['preview'],
+            'content': project['content']
+        })
+        
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
