@@ -237,7 +237,7 @@ def process_prompt(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -318,7 +318,7 @@ def create_project(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",

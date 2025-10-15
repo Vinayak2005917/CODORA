@@ -24,7 +24,7 @@ body {
 
 /* sidebar */
 .sidebar {
-  width: 200px;
+  width: 250px;
   background: white;
   border-right: 1px solid #e0e0e0;
   display: flex;
@@ -554,6 +554,7 @@ body {
   max-width: 7200px;
   height: 64px;
   border: 3px solid #cacacab8;
+  margin-left: 21px;
 }
 
 .floating-prompt input[type="text"] {
@@ -563,7 +564,7 @@ body {
   border-radius: 999px;
   font-size: 14px;
   background: #1f1f1f;
-  width: 890px;
+  width: 873px;
 }
 
 .floating-prompt input[type="text"]:focus {
