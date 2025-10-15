@@ -426,3 +426,41 @@ if (saveBtn) {
     );
   });
 }
+
+// Download PDF button wiring
+const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+if (downloadPdfBtn) {
+  downloadPdfBtn.addEventListener('click', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get('room');
+    if (!room) {
+      alert('No project room specified');
+      return;
+    }
+
+    try {
+      // Call Django backend directly (default dev server at 127.0.0.1:8000)
+      const resp = await fetch(`http://127.0.0.1:8000/api/projects/${room}/download_pdf/`, {
+        credentials: 'include'
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        alert('PDF generation failed: ' + (err.error || resp.statusText));
+        return;
+      }
+
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `project_${room}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download PDF error', err);
+      alert('Failed to download PDF');
+    }
+  });
+}
