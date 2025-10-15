@@ -12,6 +12,15 @@ from asgiref.sync import async_to_sync
 import os
 from .project_store import project_store
 from .models import User
+from django.http import HttpResponse, FileResponse
+from io import BytesIO
+
+try:
+    # optional dependency: markdown_pdf
+    from markdown_pdf import MarkdownPdf, Section
+except Exception:
+    MarkdownPdf = None
+    Section = None
 
 # Create your views here.
 
@@ -438,4 +447,39 @@ def get_project(request, room):
         })
         
     except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def download_project_pdf(request, room):
+    """
+    Generate a PDF from the project's content (assumed Markdown) and return it as a downloadable file.
+    """
+    try:
+        project = project_store.get_project(room)
+        if not project:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+
+        content = project.get('content', '')
+
+        if not content:
+            return JsonResponse({'error': 'Project has no content to export'}, status=400)
+
+        if MarkdownPdf is None:
+            return JsonResponse({'error': 'Server missing markdown_pdf dependency'}, status=500)
+
+        # Create PDF in-memory
+        mp = MarkdownPdf()
+        mp.add_section(Section(content))
+        buf = BytesIO()
+        mp.save(buf)
+        buf.seek(0)
+
+        filename = f"project_{room}.pdf"
+        response = HttpResponse(buf.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        print('PDF generation error:', str(e))
         return JsonResponse({'error': str(e)}, status=500)

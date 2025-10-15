@@ -33,4 +33,5 @@ urlpatterns = [
     path('api/projects/', views.create_project, name='create_project'),  # POST
     path('api/projects/list/', views.list_projects, name='list_projects'),  # GET
     path('api/projects/<str:room>/', views.get_project, name='get_project'),  # GET
+    path('api/projects/<str:room>/download_pdf/', views.download_project_pdf, name='download_project_pdf'),
 ]
