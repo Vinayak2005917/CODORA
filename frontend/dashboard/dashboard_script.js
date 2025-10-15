@@ -83,7 +83,7 @@ function updateUserUI() {
                     <div style="width: 40px; height: 40px; border-radius: 50%; background: ${currentUser.avatarColor}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 18px;">
                         ${currentUser.username.charAt(0).toUpperCase()}
                     </div>
-                    <span style="font-weight: 500;">${currentUser.username}</span>
+                    <span style="font-weight: 800; color: black;">${currentUser.username}</span>
                     <button id="login-btn" style="padding: 6px 12px; background: #5eb3f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">Login</button>
                 </div>
             `;
@@ -101,7 +101,7 @@ function updateUserUI() {
                     <div style="width: 40px; height: 40px; border-radius: 50%; background: ${currentUser.avatarColor}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 18px;">
                         ${currentUser.username.charAt(0).toUpperCase()}
                     </div>
-                    <span style="font-weight: 500;">${currentUser.username}</span>
+                    <span style="font-weight: 800; color: black;">${currentUser.username}</span>
                     <button id="logout-btn" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">Logout</button>
                 </div>
             `;

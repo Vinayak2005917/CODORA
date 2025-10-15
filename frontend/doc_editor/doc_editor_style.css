@@ -107,6 +107,12 @@ body {
   position: relative;
 }
 
+.timeline-item.selected {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 /* vertical connecting lines */
 .timeline-item::before {
   content: "";
@@ -165,6 +171,28 @@ body {
   font-size: 13px;
   color: #6b7280;
   line-height: 1.4;
+}
+
+.delete-version-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.delete-version-btn:hover {
+  background: rgba(239,68,68,0.12);
+}
+
+.current-indicator {
+  background: #10b981;
+  color: white;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
 }
 
 /* main content */

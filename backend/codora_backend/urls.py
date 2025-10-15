@@ -34,4 +34,8 @@ urlpatterns = [
     path('api/projects/list/', views.list_projects, name='list_projects'),  # GET
     path('api/projects/<str:room>/', views.get_project, name='get_project'),  # GET
     path('api/projects/<str:room>/download_pdf/', views.download_project_pdf, name='download_project_pdf'),
+    path('api/projects/<str:room>/commit/', views.commit_version, name='commit_version'),
+    path('api/projects/<str:room>/versions/', views.list_versions_view, name='list_versions'),
+    path('api/projects/<str:room>/versions/<str:version_id>/', views.get_version_view, name='get_version'),
+    path('api/projects/<str:room>/ai_prompt_commit/', views.ai_prompt_commit, name='ai_prompt_commit'),
 ]

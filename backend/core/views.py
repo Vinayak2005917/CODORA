@@ -237,7 +237,7 @@ def process_prompt(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -318,7 +318,7 @@ def create_project(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -390,6 +390,95 @@ def create_project(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ai_prompt_commit(request, room):
+    """
+    Accepts a prompt and the current file content from the frontend for a given room.
+    Sends a composed prompt (system instruction + current file + user request) to the AI,
+    saves the AI response as a new version (so users can access previous content),
+    and broadcasts the new content and updated versions list to the room.
+    """
+    try:
+        data = json.loads(request.body)
+        prompt = data.get('prompt', '').strip()
+        current_content = data.get('content', '')
+
+        if not prompt:
+            return JsonResponse({'error': 'Prompt is required'}, status=400)
+
+        # Verify project exists
+        proj = project_store.get_project(room)
+        if not proj:
+            return JsonResponse({'error': f'Project {room} not found'}, status=404)
+
+        # Compose system + content + user prompt
+        system_msg = (
+            "You are a helpful AI assistant named CODORA AI, used to edit and improve documents and code. "
+            "When asked for Document or text responses use Markdown formatting. When asked for code, return code blocks only."
+        )
+
+        user_message = f"Current file content:\n```\n{current_content}\n```\n\nUser request:\n{prompt}"
+
+        # Call AI
+        api_key = "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"
+        client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+
+        try:
+            completion = client.chat.completions.create(
+                extra_headers={"HTTP-Referer": "https://codora.app", "X-Title": "CODORA"},
+                extra_body={},
+                model="nvidia/nemotron-nano-9b-v2:free",
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_message},
+                ],
+            )
+            ai_response = completion.choices[0].message.content
+        except Exception as api_error:
+            print('AI API error:', api_error)
+            return JsonResponse({'error': f'AI API error: {str(api_error)}'}, status=500)
+
+        # Save AI response as a version (author = 'AI')
+        try:
+            version = project_store.save_version(room, ai_response, message=f"AI: {prompt[:60]}", author='AI')
+        except Exception as e:
+            print('Save version error:', e)
+            version = None
+
+        # Broadcast new content and versions list to room
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"editor_{room}",
+            {
+                "type": "editor.message",
+                "content": ai_response,
+                "clientId": "AI_PROMPT"
+            }
+        )
+
+        # Broadcast versions list
+        try:
+            versions = project_store.list_versions(room)
+            async_to_sync(channel_layer.group_send)(
+                f"editor_{room}",
+                {
+                    'type': 'versions.list',
+                    'versions': versions or []
+                }
+            )
+        except Exception as e:
+            print('Broadcast versions error:', e)
+
+        return JsonResponse({'ok': True, 'response': ai_response, 'version': version})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        print('ai_prompt_commit error:', e)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -482,4 +571,62 @@ def download_project_pdf(request, room):
 
     except Exception as e:
         print('PDF generation error:', str(e))
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ---------------- Versioning API ----------------
+@csrf_exempt
+@require_http_methods(["POST"])
+def commit_version(request, room):
+    """Save a new version (commit) for the given project room.
+
+    Request JSON: { "message": "Commit message", "author": "User" }
+    """
+    try:
+        project = project_store.get_project(room)
+        if not project:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+
+        data = json.loads(request.body)
+        message = data.get('message', '').strip() or 'Snapshot'
+        author = data.get('author', 'User')
+
+        version = project_store.save_version(room, project.get('content', ''), message, author)
+        if not version:
+            return JsonResponse({'error': 'Failed to save version'}, status=500)
+
+        return JsonResponse({'ok': True, 'version': version})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def list_versions_view(request, room):
+    try:
+        project = project_store.get_project(room)
+        if not project:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+
+        versions = project_store.list_versions(room) or []
+        # Return lightweight metadata (id, message, author, timestamp)
+        meta = [
+            { 'id': v['id'], 'message': v.get('message',''), 'author': v.get('author',''), 'timestamp': v.get('timestamp','') }
+            for v in versions
+        ]
+        return JsonResponse(meta, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def get_version_view(request, room, version_id):
+    try:
+        v = project_store.get_version(room, version_id)
+        if not v:
+            return JsonResponse({'error': 'Version not found'}, status=404)
+        return JsonResponse(v)
+    except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

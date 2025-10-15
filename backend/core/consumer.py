@@ -3,6 +3,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 import aiofiles
 from pathlib import Path
+from asgiref.sync import sync_to_async
 
 
 class EditorConsumer(AsyncWebsocketConsumer):
@@ -134,6 +135,12 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+        # Also tell the client who they are (so frontend knows current username/id)
+        await self.send(text_data=json.dumps({
+            'type': 'me',
+            'user': self.user_info
+        }))
         
         # Broadcast user joined to all other clients in room
         await self.channel_layer.group_send(
@@ -270,6 +277,89 @@ class EditorConsumer(AsyncWebsocketConsumer):
             )
             return
 
+        if msg_type == 'commit':
+            # Save a version snapshot via project_store
+            message = data.get('message', 'Snapshot')
+            # Prefer server-side authenticated username when available
+            if hasattr(self, 'user_info') and self.user_info:
+                author = self.user_info.get('username')
+            else:
+                author = data.get('author', 'User')
+            content = data.get('content', self.room_content_cache.get(self.room, ''))
+
+            try:
+                version = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.save_version)(self.room, content, message, author)
+            except Exception as e:
+                version = None
+                print('Commit error:', e)
+
+            if version:
+                # Acknowledge the committing client
+                await self.send(text_data=json.dumps({'type': 'version_committed', 'version': version}))
+
+                # Broadcast updated versions list to the room
+                try:
+                    versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'versions.list',
+                            'versions': versions
+                        }
+                    )
+                except Exception as e:
+                    print('Error broadcasting versions list:', e)
+            else:
+                await self.send(text_data=json.dumps({'type': 'version_committed', 'error': 'Failed to save version'}))
+
+            return
+
+        if msg_type == 'delete_version':
+            version_id = data.get('version_id')
+            try:
+                deleted = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.delete_version)(self.room, version_id)
+            except Exception as e:
+                deleted = False
+                print('delete_version error:', e)
+
+            if deleted:
+                await self.send(text_data=json.dumps({'type': 'version_deleted', 'version_id': version_id, 'ok': True}))
+                # broadcast updated versions list
+                try:
+                    versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'versions.list',
+                            'versions': versions
+                        }
+                    )
+                except Exception as e:
+                    print('Error broadcasting versions list after delete:', e)
+            else:
+                await self.send(text_data=json.dumps({'type': 'version_deleted', 'version_id': version_id, 'ok': False}))
+
+            return
+
+        if msg_type == 'list_versions':
+            try:
+                versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                await self.send(text_data=json.dumps({'type': 'versions_list', 'versions': versions or []}))
+            except Exception as e:
+                print('list_versions error:', e)
+                await self.send(text_data=json.dumps({'type': 'versions_list', 'versions': []}))
+            return
+
+        if msg_type == 'get_version':
+            version_id = data.get('version_id')
+            try:
+                v = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.get_version)(self.room, version_id)
+                await self.send(text_data=json.dumps({'type': 'version_data', 'version': v}))
+            except Exception as e:
+                print('get_version error:', e)
+                await self.send(text_data=json.dumps({'type': 'version_data', 'error': 'not found'}))
+            return
+
         # Ignore unknown message types
         return
 
@@ -299,7 +389,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
-    
     async def user_left_message(self, event):
         """Broadcast user left event"""
         await self.send(
@@ -311,3 +400,10 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    async def versions_list(self, event):
+        """Broadcast the versions list to clients."""
+        await self.send(text_data=json.dumps({
+            'type': 'versions_list',
+            'versions': event.get('versions', [])
+        }))

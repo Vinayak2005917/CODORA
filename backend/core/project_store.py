@@ -6,7 +6,7 @@ import json
 import os
 import random
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 from django.conf import settings
 
@@ -196,22 +196,120 @@ class ProjectStore:
         # Load metadata to get type
         with open(meta_path, 'r', encoding='utf-8') as f:
             meta = json.load(f)
-        
+
         # Save content
         content_filename = self.get_content_filename(meta.get('type', 'doc'))
         content_path = room_path / content_filename
-        
+
         with open(content_path, 'w', encoding='utf-8') as f:
             f.write(content)
-        
-        # Update metadata timestamp and preview
-        meta['updated_at'] = datetime.utcnow().isoformat()
+
+        # Update metadata timestamp and preview (UTC)
+        meta['updated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
         meta['preview'] = self.extract_preview(content)
-        
+
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
-        
+
         return True
+
+    # ---------------- Versioning ----------------
+    def _versions_dir(self, room: str):
+        room_path = self.get_project_path(room)
+        versions_path = room_path / 'versions'
+        versions_path.mkdir(parents=True, exist_ok=True)
+        return versions_path
+
+    def save_version(self, room: str, content: str, message: str, author: str = 'User') -> Optional[Dict]:
+        """
+        Save a snapshot/version of the project's content.
+
+        Returns version metadata dict or None if room doesn't exist.
+        """
+        room_path = self.get_project_path(room)
+        if not room_path.exists():
+            return None
+
+        versions_path = self._versions_dir(room)
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        timestamp = now.isoformat()  # includes timezone offset
+        # Filename: YYYYmmddHHMMSS_micro.json to keep ordering
+        filename = now.strftime('%Y%m%d%H%M%S%f') + '.json'
+        version_path = versions_path / filename
+
+        version_data = {
+            'id': filename.replace('.json', ''),
+            'room': room,
+            'message': message,
+            'author': author,
+            'timestamp': timestamp,
+            'content': content
+        }
+
+        with open(version_path, 'w', encoding='utf-8') as f:
+            json.dump(version_data, f, indent=2, ensure_ascii=False)
+
+        # Update project's updated_at and preview
+        self.save_content(room, content)
+
+        return version_data
+
+    def list_versions(self, room: str) -> Optional[List[Dict]]:
+        """List saved versions for a project, most recent first."""
+        room_path = self.get_project_path(room)
+        if not room_path.exists():
+            return None
+
+        versions_path = room_path / 'versions'
+        if not versions_path.exists():
+            return []
+
+        versions = []
+        for vfile in versions_path.iterdir():
+            if not vfile.is_file() or not vfile.name.endswith('.json'):
+                continue
+            try:
+                with open(vfile, 'r', encoding='utf-8') as f:
+                    v = json.load(f)
+                    versions.append(v)
+            except Exception:
+                continue
+
+        # Sort by id (timestamp) descending
+        versions.sort(key=lambda x: x.get('id', ''), reverse=True)
+        return versions
+
+    def get_version(self, room: str, version_id: str) -> Optional[Dict]:
+        """Retrieve a specific version by id (filename without .json)."""
+        versions_path = self.get_project_path(room) / 'versions'
+        if not versions_path.exists():
+            return None
+
+        vfile = versions_path / (version_id + '.json')
+        if not vfile.exists():
+            return None
+
+        try:
+            with open(vfile, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def delete_version(self, room: str, version_id: str) -> bool:
+        """Delete a version file. Returns True if deleted, False otherwise."""
+        versions_path = self.get_project_path(room) / 'versions'
+        if not versions_path.exists():
+            return False
+
+        vfile = versions_path / (version_id + '.json')
+        if not vfile.exists():
+            return False
+
+        try:
+            vfile.unlink()
+            return True
+        except Exception:
+            return False
 
 
 # Singleton instance

@@ -1,0 +1,9 @@
+{
+  "room": "914529",
+  "type": "doc",
+  "title": "Turing Machines: A Simple Explanation with an Exam",
+  "prompt": "Explain the concept of Turing Machines with a simple example.",
+  "created_at": "2025-10-15T19:18:59.531128",
+  "updated_at": "2025-10-15T20:12:59.293440+00:00",
+  "preview": "markdown Welcome to the Turing Machine Speech Hey everyone! Today, I want to take you on a journey through one of the most elegant ideas in all of computer science—the Turing Machine. Not a physical device you’ll find in your laptop, but a powerful concept that lies at the heart of why computers can..."
+}
