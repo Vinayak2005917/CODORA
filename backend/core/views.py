@@ -228,7 +228,7 @@ def process_prompt(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -247,7 +247,7 @@ def process_prompt(request):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant. Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate."
+                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments"
                     },
                     {
                         "role": "user",
@@ -309,7 +309,7 @@ def create_project(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = "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"
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -328,7 +328,7 @@ def create_project(request):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant. Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate."
+                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments"
                     },
                     {
                         "role": "user",

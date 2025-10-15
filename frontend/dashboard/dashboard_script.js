@@ -130,58 +130,6 @@ async function logout() {
     }
 }
 
-// Sample projects data
-const projects = [
-    {
-        id: 1,
-        type: 'document',
-        title: 'Residential Lease Agreement',
-        lastEdited: '3 days ago',
-        preview: `RESIDENTIAL LEASE AGREEMENT
-        
-Note: This template was created and can only be used by the author in question. It will only ever be used for the publisher's benefit in all the time of use. It cannot be used for any individual and cannot be shared and distributed.
-
-This Residential Lease Agreement ("agreement") is entered into by and between:
-
-Landlord: [Landlord Full Name]
-Address: [Property Address]
-
-For both eventually interested...`
-    },
-    {
-        id: 2,
-        type: 'code',
-        title: 'Positive numbers with C',
-        lastEdited: '5 days ago',
-        preview: `<span class="code-keyword">include</span> <span class="code-string">&lt;iostream&gt;</span>
-<span class="code-keyword">using namespace</span> std;
-
-<span class="code-keyword">int</span> <span class="code-function">main</span>()
-{
-    <span class="code-keyword">unsigned int</span> n;
-    <span class="code-keyword">unsigned long long</span> factorial = <span class="code-number">1</span>;
-    
-    cout <span class="code-keyword">&lt;&lt;</span> <span class="code-string">"Enter a positive integer: "</span>;
-    cin <span class="code-keyword">&gt;&gt;</span> n;
-    
-    <span class="code-keyword">for</span>(<span class="code-keyword">int</span> i = <span class="code-number">1</span>; i &lt;= n; ++i)
-}`
-    },
-    {
-        id: 3,
-        type: 'document',
-        title: '(Old) Residential Lease Agreement',
-        lastEdited: '10 days ago',
-        preview: `RESIDENTIAL LEASE AGREEMENT
-(Single-Family Home)
-
-Note: This template was created and can only be used by the author in question. It will only ever be used for the publisher's benefit...
-
-This Residential Lease Agreement ("agreement") is entered into by and between:
-
-For both eventually interested, real advice gets and calculus combinations, for...`
-    }
-];
 
 // Load projects from backend
 async function loadProjects() {
@@ -292,6 +240,26 @@ function openProject(room, type) {
     }[type] || '../doc_editor/doc_editor.html';
     
     window.location.href = `${editorUrl}?room=${room}`;
+}
+
+// Fetch the latest project (most recently updated) from backend
+async function fetchLatestProject() {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/projects/list/');
+        if (!response.ok) {
+            throw new Error('Failed to fetch projects list');
+        }
+
+        const projects = await response.json();
+        if (!Array.isArray(projects) || projects.length === 0) return null;
+
+        // Sort by updatedAt descending and return the first
+        projects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        return projects[0];
+    } catch (err) {
+        console.error('fetchLatestProject error:', err);
+        throw err;
+    }
 }
 
 // Copy room number to clipboard
@@ -425,18 +393,54 @@ async function processPrompt() {
         // Check if response is successful
         if (response.ok && data.ok) {
             console.log('SUCCESS! Project created:', data.room); // Debug log
-            
+
             // Show success state
             goButton.textContent = '✅ Done!';
             goButton.style.opacity = '1';
             goButton.style.backgroundColor = '#10b981';
-            
-            console.log('🚀 Redirecting to:', data.redirect); // Debug log
-            
-            // Redirect to the appropriate editor with room number
-            setTimeout(() => {
-                window.location.href = data.redirect;
-            }, 500);
+
+            // Prefer backend-provided redirect if present
+            if (data.redirect) {
+                console.log('🚀 Redirecting to backend-provided URL:', data.redirect);
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 500);
+                return;
+            }
+
+            // If backend did not provide a redirect, fetch the latest projects and redirect to the newest one
+            try {
+                const latest = await fetchLatestProject();
+                if (latest && latest.room) {
+                    const editorUrl = {
+                        'doc': '../doc_editor/doc_editor.html',
+                        'code': '../code_editor/code_editor.html',
+                        'lesson': '../lesson_planner/lesson_planner.html'
+                    }[latest.type] || '../doc_editor/doc_editor.html';
+
+                    const dest = `${editorUrl}?room=${latest.room}`;
+                    console.log('🚀 Redirecting to latest project:', dest);
+                    setTimeout(() => { window.location.href = dest; }, 500);
+                    return;
+                }
+            } catch (err) {
+                console.error('Failed to fetch latest project for redirect:', err);
+            }
+
+            // Final fallback - if response returned a room value, open that
+            if (data.room) {
+                const fallbackUrl = `../doc_editor/doc_editor.html?room=${data.room}`;
+                console.log('🚀 Fallback redirect to room:', fallbackUrl);
+                setTimeout(() => { window.location.href = fallbackUrl; }, 500);
+                return;
+            }
+
+            // If all else fails, re-enable controls and show error
+            alert('Project created but could not determine where to redirect. Please open the workspace to find your project.');
+            goButton.disabled = false;
+            promptInput.disabled = false;
+            goButton.textContent = 'Go!';
+            goButton.style.opacity = '1';
 
         } else {
             console.error('❌ Failed! response.ok:', response.ok, 'data.ok:', data.ok);

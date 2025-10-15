@@ -59,6 +59,38 @@ updateLineNumbers();
 renderVersionHistory();
 renderCollaborators();
 
+// Create floating prompt input at bottom if not already present
+(function createFloatingPrompt(){
+  if (document.getElementById('floatingPrompt')) return;
+
+  const container = document.createElement('div');
+  container.id = 'floatingPrompt';
+  container.className = 'floating-prompt';
+
+  const input = document.createElement('input');
+  input.id = 'promptInput';
+  input.className = 'prompt-input';
+  input.placeholder = "Enter a prompt to generate content... (e.g., 'Refactor this function')";
+
+  const btn = document.createElement('button');
+  btn.id = 'generateBtn';
+  btn.className = 'generate-btn';
+  btn.innerHTML = '<span id="generateText">Generate</span>';
+  btn.addEventListener('click', generateContent);
+
+  container.appendChild(input);
+  container.appendChild(btn);
+  document.body.appendChild(container);
+
+  // allow Enter to submit
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      generateContent();
+    }
+  });
+})();
+
 // editor functionality
 document.getElementById("editor").addEventListener("input", updateLineNumbers);
 document.getElementById("editor").addEventListener("scroll", function () {
@@ -193,7 +225,8 @@ function addCommit() {
 }
 
 // --- WebSocket collaborative editing ---
-const editor = document.getElementById('codeEditor');
+// Use the textarea with id 'editor' (matches the HTML in code_editor.html)
+const editor = document.getElementById('editor');
 const saveBtn = document.getElementById('saveBtn');
 const saveStatus = document.getElementById('saveStatus');
 const connStatus = document.getElementById('connStatus');
@@ -202,10 +235,10 @@ const connStatus = document.getElementById('connStatus');
 const urlParams = new URLSearchParams(window.location.search);
 const room = urlParams.get('room') || 'default';
 
-// Update project title
-const projectTitle = document.querySelector('.project-title');
-if (projectTitle && room !== 'default') {
-  projectTitle.textContent = `Code Room: ${room}`;
+// Update project title/input
+const projectNameInput = document.getElementById('projectName');
+if (projectNameInput && room !== 'default') {
+  projectNameInput.value = `Code Room: ${room}`;
 }
 
 // Build WebSocket URL

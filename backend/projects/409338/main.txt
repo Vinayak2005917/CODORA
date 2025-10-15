@@ -1,0 +1,41 @@
+# Simple Interest Calculator in Python
+
+This is a basic Python program to calculate simple interest using the formula:  
+**Simple Interest = (Principal × Rate × Time) / 100**
+
+---
+
+## Code Implementation
+
+```python
+# Get input from the user
+principal = float(input("Enter the principal amount: "))
+rate = float(input("Enter the annual interest rate (in %): "))
+time = float(input("Enter the time in years: "))
+
+# Calculate simple interest
+simple_interest = (principal * rate * time) / 100
+
+# Display the result
+print(f"**Simple Interest:** ${simple_interest:.2f}")  # Formatted to 2 decimal places
+```
+
+---
+
+## How It Works
+- **Principal**: The initial amount of money (e.g., $1000).
+- **Rate**: The annual interest rate (e.g., 5 for 5%).
+- **Time**: The number of years the money is invested/borrowed (e.g., 3).
+- The formula computes the total interest earned or paid over the given period.
+
+---
+
+## Example Output
+```
+Enter the principal amount: 5000
+Enter the annual interest rate (in %): 4.5
+Enter the time in years: 2
+**Simple Interest:** $450.00
+```
+
+Let me know if you'd like to add features like error handling or a GUI interface! 😊

@@ -45,27 +45,10 @@
                 </div>
             </div>
 
-            <!-- prompt section -->
-            <div class="ai-prompt-section" id="aiPromptSection">
-                <div class="prompt-container">
-                    <div class="prompt-header">
-                        <h2 style="font-size: 18px; font-weight: 600;">AI Content Generator</h2>
-                    </div>
-                    <div class="prompt-input-group">
-                        <input type="text" class="prompt-input"
-                            placeholder="Enter your prompt here... (e.g., 'Why am I black and colourblind?')"
-                            id="promptInput">
-                        <button class="generate-btn" onclick="generateContent()" id="generateBtn">
-                            <span id="generateText">Generate</span>
-                        </button>
-                    </div>
-                    <button class="toggle-prompt-btn" onclick="togglePromptPanel()">Hide prompt panel</button>
-                </div>
+            <!-- prompt section (moved to floating input at bottom) -->
+            <div id="aiPromptSection" class="ai-prompt-section hidden">
+                <!-- original top prompt removed; floating prompt will be rendered at the bottom -->
             </div>
-
-            <button class="show-prompt-btn hidden" id="showPromptBtn" onclick="togglePromptPanel()">
-                <span>Show AI Prompt Panel</span>
-            </button>
 
             <!-- editor area -->
             <div class="editor-container">

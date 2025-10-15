@@ -1,0 +1,9 @@
+{
+  "room": "749282",
+  "type": "code",
+  "title": "Python GUI Calculator using Tkinter",
+  "prompt": "Give me a python code for a GUI calculator using tkinter",
+  "created_at": "2025-10-15T16:28:41.735156",
+  "updated_at": "2025-10-15T16:28:41.735156",
+  "preview": "Python GUI Calculator using Tkinter This guide provides a simple calculator implementation using Python's Tkinter library. The calculator supports basic arithmetic operations and has a clean interface. Features - Basic Operations: Addition, Subtraction, Multiplication, Division - Clear Function: Res..."
+}

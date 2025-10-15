@@ -1,0 +1,9 @@
+{
+  "room": "409338",
+  "type": "code",
+  "title": "Simple Interest Calculator in Python",
+  "prompt": "Write me python code for a simple intrest calculator",
+  "created_at": "2025-10-15T16:22:47.669103",
+  "updated_at": "2025-10-15T16:22:47.669103",
+  "preview": "Simple Interest Calculator in Python This is a basic Python program to calculate simple interest using the formula: Simple Interest = (Principal × Rate × Time) / 100 --- Code Implementation python Get input from the user principal = float(input(\"Enter the principal amount: \")) rate = float(input(\"En..."
+}

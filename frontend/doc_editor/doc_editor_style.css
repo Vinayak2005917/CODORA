@@ -536,3 +536,53 @@ body {
   font-style: italic;
   color: #555;
 }
+
+/* Floating prompt input at bottom center */
+.floating-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #1f1f1f;
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border-radius: 10px;
+  z-index: 9999;
+  max-width: 7200px;
+  height: 64px;
+  border: 3px solid #cacacab8;
+}
+
+.floating-prompt input[type="text"] {
+  flex: 1;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  background: #1f1f1f;
+  width: 890px;
+}
+
+.floating-prompt input[type="text"]:focus {
+  outline: none;
+  background: #1f1f1f;
+  color: white;
+}
+
+.floating-prompt button.generate-btn {
+  background: #00c903;
+  color: 1f1f1f;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.floating-prompt button.generate-btn:disabled {
+  background: #9dd6ff;
+  cursor: default;
+}

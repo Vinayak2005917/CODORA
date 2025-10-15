@@ -344,6 +344,64 @@ function showNotification(message, type = "info") {
 
 connect();
 
+// ---------------- Floating prompt (bottom) ----------------
+// If there's already a floating prompt, don't recreate it
+function ensureFloatingPrompt() {
+  if (document.getElementById('floatingPrompt')) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'floatingPrompt';
+  wrapper.className = 'floating-prompt';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Enter a prompt to generate content...';
+  input.id = 'floatingPromptInput';
+
+  const btn = document.createElement('button');
+  btn.className = 'generate-btn';
+  btn.textContent = 'Generate';
+
+  btn.onclick = async () => {
+    const prompt = input.value.trim();
+    if (!prompt) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Not connected to server yet. Please wait.');
+        return;
+      }
+
+      ws.send(JSON.stringify({ type: 'prompt', prompt, clientId }));
+      // Optionally clear input or keep it
+      input.value = '';
+      showNotification('Prompt sent — AI generating...', 'success');
+    } catch (err) {
+      console.error('Failed to send prompt:', err);
+      showNotification('Failed to send prompt', 'info');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+    }
+  };
+
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') btn.click();
+  });
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(btn);
+  document.body.appendChild(wrapper);
+}
+
+// Ensure the prompt is created after DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+  ensureFloatingPrompt();
+});
+
 // Debounced send of edits
 let editTimeout;
 editor.addEventListener("input", () => {
