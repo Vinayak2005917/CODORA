@@ -154,15 +154,16 @@ if (projectTitle && room !== 'default') {
   projectTitle.textContent = `Project Room: ${room}`;
 }
 
-// Build WebSocket URL with room parameter.
-// Use page hostname so the frontend works whether served from localhost or another dev host.
-const _protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const _host = window.location.hostname || '127.0.0.1';
-const _port = '8000';
-const wsBase = `${_protocol}://${_host}:${_port}`;
+
+// Derive WebSocket endpoint based on current_endpoint
+const wsBase = current_endpoint.replace(/^https?/, current_endpoint.startsWith('https') ? 'wss' : 'ws');
+
+// Build the WebSocket URL
 const wsUrl = room === 'default'
   ? `${wsBase}/ws/editor/`
   : `${wsBase}/ws/editor/${room}/`;
+
+console.log('Connecting to room:', room, 'via', wsUrl);
 
 console.log('Connecting to room:', room, 'via', wsUrl);
 

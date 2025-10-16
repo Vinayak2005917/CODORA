@@ -94,6 +94,10 @@
                 return;
             }
 
+            const submitButton = document.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Signing in...';
+
             try {
                 console.log('Sending login request to backend...');
                 const response = await fetch(`${current_endpoint}/api/auth/login/`, {
@@ -124,6 +128,9 @@
             } catch (error) {
                 console.error('Login error:', error);
                 showError('Network error. Please try again.');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Sign in';
             }
         });
     </script>
