@@ -237,7 +237,7 @@ def process_prompt(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = os.getenv("OPENROUTER_API_KEY")
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -318,7 +318,7 @@ def create_project(request):
             return JsonResponse({'error': 'Prompt is required'}, status=400)
         
         # Initialize OpenAI client with OpenRouter
-        api_key = "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"
+        api_key = os.getenv("OPENROUTER_API_KEY")
         print(f"DEBUG: Using API key: {api_key[:20]}... (length: {len(api_key)})")
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -402,6 +402,18 @@ def ai_prompt_commit(request, room):
     saves the AI response as a new version (so users can access previous content),
     and broadcasts the new content and updated versions list to the room.
     """
+    def extract_code_blocks(text):
+        """
+        Extract content between ``` and ``` markers, ignoring language specifiers.
+        Returns concatenated code blocks or original text if no blocks found.
+        """
+        import re
+        # Find all code blocks: ```optional_lang\ncode\n```
+        code_blocks = re.findall(r'```(?:\w+)?\n?(.*?)\n?```', text, re.DOTALL)
+        if code_blocks:
+            return '\n\n'.join(code_blocks)
+        return text
+
     try:
         data = json.loads(request.body)
         prompt = data.get('prompt', '').strip()
@@ -415,16 +427,19 @@ def ai_prompt_commit(request, room):
         if not proj:
             return JsonResponse({'error': f'Project {room} not found'}, status=404)
 
+        # Extract only code blocks from current content
+        code_only = extract_code_blocks(current_content)
+
         # Compose system + content + user prompt
         system_msg = (
             "You are a helpful AI assistant named CODORA AI, used to edit and improve documents and code. "
             "When asked for Document or text responses use Markdown formatting. When asked for code, return code blocks only."
         )
 
-        user_message = f"Current file content:\n```\n{current_content}\n```\n\nUser request:\n{prompt}"
+        user_message = f"Current file content:\n```\n{code_only}\n```\n\nUser request:\n{prompt}"
 
         # Call AI
-        api_key = "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"
+        api_key = os.getenv("OPENROUTER_API_KEY")
         client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
         try:

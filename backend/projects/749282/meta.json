@@ -4,6 +4,6 @@
   "title": "Python GUI Calculator using Tkinter",
   "prompt": "Give me a python code for a GUI calculator using tkinter",
   "created_at": "2025-10-15T16:28:41.735156",
-  "updated_at": "2025-10-15T16:28:41.735156",
-  "preview": "Python GUI Calculator using Tkinter This guide provides a simple calculator implementation using Python's Tkinter library. The calculator supports basic arithmetic operations and has a clean interface. Features - Basic Operations: Addition, Subtraction, Multiplication, Division - Clear Function: Res..."
+  "updated_at": "2025-10-15T21:53:49.518205+00:00",
+  "preview": "import tkinter as tk Initialize main window root = tk.Tk() root.title(\"Calculator\") root.geometry(\"300x400\") Create display area display = tk.Label(root, text=\"0\", anchor=\"e\", font=(\"Arial\", 20), padx=10, pady=10) display.pack(fill=\"x\") Variables to track calculations current_input = \"\" stored_numbe..."
 }

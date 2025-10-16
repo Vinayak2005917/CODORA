@@ -1,55 +1,43 @@
-# Holiday Application Template
-
-## Employee Information
-- **Name**: [Your Full Name]  
-- **Position**: [Your Job Title]  
-- **Contact Information**: [Email/Phone Number]  
-
----
-
-## Date of Application  
-[Insert Date]  
-
----
-
-## Recipient Information  
-- **Manager/HR Representative**: [Name]  
-- **Department**: [Department Name]  
-
----
-
-## Subject  
-**Request for Holiday Leave from [Start Date] to [End Date]**  
-
----
-
-## Body of the Application  
-
-Dear [Manager/HR Representative's Name],  
-
-I am writing to formally request **holiday leave** from my position at [Company Name] for the period from **[Start Date]** to **[End Date]**.  
-
-### Reason for Leave  
-- **Personal Reason**: [e.g., vacation, family event, medical appointment]  
-- **Professional Reason** (if applicable): [e.g., project-related absence, training]  
-
-I have ensured that my responsibilities will be covered during my absence, and I am happy to discuss any arrangements in advance.  
-
-### Supporting Documents (if required)  
-- [Attach medical certificate, travel proof, etc.]  
-
-Please let me know if further details or adjustments are needed. I appreciate your understanding and consideration.  
-
-Sincerely,  
-[Your Full Name]  
-[Your Signature (if submitting physically)]  
-
----
-
-## Optional Additions  
-- **Colleagues to Inform**: [List names or roles]  
-- **Alternative Dates**: [Propose alternative dates if flexible]  
-
----
-
-This template can be adapted for specific industries or companies. Let me know if you'd like to tailor it further!
+<h1>Holiday Application Template</h1>
+<h2>Employee Information</h2>
+<ul>
+<li><strong>Name</strong>: [Your Full Name]  </li>
+<li><strong>Position</strong>: [Your Job Title]  </li>
+<li><strong>Contact Information</strong>: [Email/Phone Number]</li>
+</ul>
+<hr>
+<h2>Date of Application</h2>
+<p>[Insert Date]  </p>
+<hr>
+<h2>Recipient Information</h2>
+<ul>
+<li><strong>Manager/HR Representative</strong>: [Name]  </li>
+<li><strong>Department</strong>: [Department Name]</li>
+</ul>
+<hr>
+<h2>Subject</h2>
+<p><strong>Request for Holiday Leave from [Start Date] to [End Date]</strong>  </p>
+<hr>
+<h2>Body of the Application</h2>
+<p>Dear [Manager/HR Representative's Name],  </p>
+<p>I am writing to formally request <strong>holiday leave</strong> from my position at [Company Name] for the period from <strong>[Start Date]</strong> to <strong>[End Date]</strong>.  </p>
+<h3>Reason for Leave</h3>
+<ul>
+<li><strong>Personal Reason</strong>: [e.g., vacation, family event, medical appointment]  </li>
+<li><strong>Professional Reason</strong> (if applicable): [e.g., project-related absence, training]</li>
+</ul>
+<p>I have ensured that my responsibilities will be covered during my absence, and I am happy to discuss any arrangements in advance.  </p>
+<h3>Supporting Documents (if required)</h3>
+<ul>
+<li>[Attach medical certificate, travel proof, etc.]</li>
+</ul>
+<p>Please let me know if further details or adjustments are needed. I appreciate your understanding and consideration.  </p>
+<p>Sincerely,<br>[Your Full Name]<br>[Your Signature (if submitting physically)]  </p>
+<hr>
+<h2>Optional Additions</h2>
+<ul>
+<li><strong>Colleagues to Inform</strong>: [List names or roles]  </li>
+<li><strong>Alternative Dates</strong>: [Propose alternative dates if flexible]</li>
+</ul>
+<hr>
+<p>This template can be adapted for specific industries or companies. Let me know if you'd like to tailor it further!</p>

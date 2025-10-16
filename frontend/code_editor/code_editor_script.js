@@ -1,231 +1,199 @@
-// mockup commit data
-let versions = [
-  {
-    id: 7,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  {
-    id: 6,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  {
-    id: 5,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  {
-    id: 4,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  {
-    id: 3,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  {
-    id: 2,
-    message: "Add the conclusion section...",
-    time: "3:30 A.M",
-    user: "User 1",
-  },
-  { id: 1, message: "Initial commit", time: "3:00 A.M", user: "User 1" },
-];
-
-const collaborators = [
-  { id: 1, name: "User 1 (You)", color: "#3b82f6", emoji: "👤", online: true },
-  { id: 2, name: "User 2's Name", color: "#f97316", emoji: "👤", online: true },
-  { id: 3, name: "User 3's Name", color: "#10b981", emoji: "👤", online: true },
-  { id: 4, name: "AI", color: "#2563eb", emoji: "🤖", online: true },
-];
-
-const initialContent = `// Welcome to Codora's AI Document Editor
-// Start by entering a prompt to generate content
-
-function example() {
-  console.log("Your AI-generated content will appear here");
-}`;
-
-// initialization
-document.getElementById("editor").value = initialContent;
-updateLineNumbers();
-renderVersionHistory();
-renderCollaborators();
-
-// Create floating prompt input at bottom if not already present
-(function createFloatingPrompt(){
-  if (document.getElementById('floatingPrompt')) return;
-
-  const container = document.createElement('div');
-  container.id = 'floatingPrompt';
-  container.className = 'floating-prompt';
-
-  const input = document.createElement('input');
-  input.id = 'promptInput';
-  input.className = 'prompt-input';
-  input.placeholder = "Enter a prompt to generate content... (e.g., 'Refactor this function')";
-
-  const btn = document.createElement('button');
-  btn.id = 'generateBtn';
-  btn.className = 'generate-btn';
-  btn.innerHTML = '<span id="generateText">Generate</span>';
-  btn.addEventListener('click', generateContent);
-
-  container.appendChild(input);
-  container.appendChild(btn);
-  document.body.appendChild(container);
-
-  // allow Enter to submit
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      generateContent();
-    }
-  });
-})();
-
-// editor functionality
-document.getElementById("editor").addEventListener("input", updateLineNumbers);
-document.getElementById("editor").addEventListener("scroll", function () {
-  document.getElementById("lineNumbers").scrollTop = this.scrollTop;
-});
-
 document
-  .getElementById("promptInput")
-  .addEventListener("keypress", function (e) {
-    if (e.key === "Enter") {
-      generateContent();
-    }
-  });
+// --- Version history and prompt features from doc_editor ---
+let versions = [];
+let currentUser = null;
+let currentVersionId = null;
 
-function updateLineNumbers() {
-  const editor = document.getElementById("editor");
-  const lineNumbers = document.getElementById("lineNumbers");
-  const lines = editor.value.split("\n").length;
-  lineNumbers.innerHTML = Array.from({ length: lines }, (_, i) => i + 1).join(
-    "\n"
-  );
+function escapeHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function renderVersionHistory() {
+const local_endpoint = 'http://127.0.0.1:8000';
+const production_endpoint = 'https://codora-vk5z.onrender.com';
+const current_endpoint = production_endpoint;
+
+async function renderVersionHistory() {
   const container = document.getElementById("versionHistory");
-  container.innerHTML = versions
-    .map(
-      (v) => `
-        <div class="version-item">
-            <div class="version-dot"><div class="version-dot-inner"></div></div>
-            <div class="version-info">
-                <div class="version-message">${v.message}</div>
-                <div class="version-meta">${v.time}</div>
-                <div class="version-meta">by ${v.user}</div>
-            </div>
-        </div>
-    `
-    )
-    .join("");
-}
-
-function renderCollaborators() {
-  const container = document.getElementById("collaboratorsList");
-  container.innerHTML = collaborators
-    .map(
-      (c) => `
-        <div class="collaborator-item">
-            <div class="collaborator-avatar" style="background: ${c.color}">
-                ${c.emoji}
-                ${c.online ? '<div class="online-indicator"></div>' : ""}
-            </div>
-            <span class="collaborator-name">${c.name}</span>
-        </div>
-    `
-    )
-    .join("");
-}
-
-function togglePromptPanel() {
-  const section = document.getElementById("aiPromptSection");
-  const btn = document.getElementById("showPromptBtn");
-
-  if (section.classList.contains("hidden")) {
-    section.classList.remove("hidden");
-    btn.classList.add("hidden");
-  } else {
-    section.classList.add("hidden");
-    btn.classList.remove("hidden");
+  if (!container) return;
+  try {
+    container.innerHTML = '<div style="padding:16px;color:#6b7280">Loading versions…</div>';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'list_versions' }));
+    } else {
+      container.innerHTML = '<div style="padding:16px;color:#6b7280">Not connected</div>';
+    }
+  } catch (e) {
+    console.error('Failed to request versions', e);
+    container.innerHTML = '<div style="padding:16px;color:#6b7280">Failed to fetch versions</div>';
   }
 }
 
-function generateContent() {
-  const prompt = document.getElementById("promptInput").value.trim();
-  if (!prompt) return;
-
-  const btn = document.getElementById("generateBtn");
-  const text = document.getElementById("generateText");
-
-  // disable button and show loading
-  btn.disabled = true;
-  text.textContent = "Generating...";
-
-  // simulate AI generation
-  setTimeout(() => {
-    const editor = document.getElementById("editor");
-    const newContent = `// Generated content based on: "${prompt}"\n\n${editor.value}`;
-    editor.value = newContent;
-    updateLineNumbers();
-
-    // add to version history
-    const now = new Date();
-    const newVersion = {
-      id: versions[0].id + 1,
-      message: `Generated: ${prompt.substring(0, 30)}${
-        prompt.length > 30 ? "..." : ""
-      }`,
-      time: now.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-      user: "AI",
-    };
-    versions.unshift(newVersion);
-    renderVersionHistory();
-
-    // reset button
-    btn.disabled = false;
-    text.textContent = "Generate";
-    document.getElementById("promptInput").value = "";
-  }, 2000);
-}
-
-function addCommit() {
-  const message = document.getElementById("commitMessage").value.trim();
+async function addCommit() {
+  const input = document.getElementById("commitMessage");
+  const message = input.value.trim();
   if (!message) return;
-
-  const now = new Date();
-  const newVersion = {
-    id: versions[0].id + 1,
-    message,
-    time: now.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }),
-    user: "User 1",
-  };
-  versions.unshift(newVersion);
-  renderVersionHistory();
-  document.getElementById("commitMessage").value = "";
+  try {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      alert('Not connected to server yet');
+      return;
+    }
+    ws.send(JSON.stringify({ type: 'commit', message, content: editor ? editor.value : '' }));
+    input.value = '';
+  } catch (e) {
+    console.error('Commit error', e);
+    alert('Commit failed');
+  }
 }
 
-// --- WebSocket collaborative editing ---
-// Use the textarea with id 'editor' (matches the HTML in code_editor.html)
+window.addEventListener("DOMContentLoaded", () => {
+  renderVersionHistory();
+  const commitBtn = document.querySelector(".commit-btn");
+  if (commitBtn) commitBtn.addEventListener("click", addCommit);
+  const commitInput = document.getElementById("commitMessage");
+  if (commitInput) commitInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      addCommit();
+    }
+  });
+});
+
+// Floating prompt (bottom)
+function ensureFloatingPrompt() {
+  if (document.getElementById('floatingPrompt')) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.id = 'floatingPrompt';
+  wrapper.className = 'floating-prompt';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Enter a prompt to generate content...';
+  input.id = 'floatingPromptInput';
+
+  const btn = document.createElement('button');
+  btn.className = 'generate-btn';
+  btn.textContent = 'Generate';
+
+  function showLoading(message = 'Generating…') {
+    let overlay = document.getElementById('aiLoadingOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'aiLoadingOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100000;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:white;padding:20px 30px;border-radius:12px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,0.2);';
+      const spinner = document.createElement('div');
+      spinner.style.cssText = 'width:28px;height:28px;border-radius:50%;border:4px solid #f3f4f6;border-top-color:#3b82f6;animation:spin 1s linear infinite';
+      const text = document.createElement('div');
+      text.id = 'aiLoadingText';
+      text.textContent = message;
+      box.appendChild(spinner);
+      box.appendChild(text);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      const style = document.createElement('style');
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg) } }';
+      document.head.appendChild(style);
+    } else {
+      const text = document.getElementById('aiLoadingText');
+      if (text) text.textContent = message;
+      overlay.style.display = 'flex';
+    }
+  }
+
+  function hideLoading() {
+    const overlay = document.getElementById('aiLoadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  btn.onclick = async () => {
+    const prompt = input.value.trim();
+    if (!prompt) return;
+
+    btn.disabled = true;
+    showLoading();
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const room = urlParams.get('room');
+      if (!room) {
+        showNotification('No project room specified', 'info');
+        return;
+      }
+
+      const endpoint = `https://codora-vk5z.onrender.com/api/projects/${room}/ai_prompt_commit/`;
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt, content: editor ? editor.value : '' })
+      });
+
+      let data = {};
+      try {
+        data = await resp.json();
+      } catch (err) {
+        const txt = await resp.text().catch(() => '');
+        console.error('AI prompt commit non-JSON response', resp.status, txt);
+        if (resp.status === 404 && txt.includes('Project')) {
+          showNotification('Project not found on server. Open or create the project first.', 'info');
+          return;
+        }
+        showNotification('AI request failed', 'info');
+        return;
+      }
+      if (!resp.ok) {
+        console.error('AI prompt commit failed', resp.status, data);
+        if (resp.status === 404 && data && data.error && data.error.includes('not found')) {
+          showNotification('Project not found on server. Open or create the project first.', 'info');
+          return;
+        }
+        showNotification('AI request failed', 'info');
+        return;
+      }
+
+      if (data && data.version) {
+        const existing = (versions || []).find(v => v.id === data.version.id);
+        if (!existing) versions = [data.version, ...(versions || [])];
+        else {
+          versions = [data.version, ...versions.filter(v => v.id !== data.version.id)];
+        }
+        currentVersionId = data.version.id;
+        renderVersionHistory();
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'list_versions' }));
+
+      showNotification('AI response added as a new commit', 'success');
+      input.value = '';
+
+    } catch (err) {
+      console.error('AI prompt commit error', err);
+      showNotification('AI request error', 'info');
+    } finally {
+      btn.disabled = false;
+      hideLoading();
+    }
+  };
+
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      btn.click();
+    }
+  });
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(btn);
+  document.body.appendChild(wrapper);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  ensureFloatingPrompt();
+});
 const editor = document.getElementById('editor');
 const saveBtn = document.getElementById('saveBtn');
 const saveStatus = document.getElementById('saveStatus');
@@ -243,8 +211,8 @@ if (projectNameInput && room !== 'default') {
 
 // Build WebSocket URL
 const wsUrl = room === 'default'
-  ? "ws://127.0.0.1:8000/ws/editor/"
-  : `ws://127.0.0.1:8000/ws/editor/${room}/`;
+  ? `${current_endpoint}/ws/editor/`
+  : `${current_endpoint}/ws/editor/${room}/`;
 
 console.log('Connecting to code room:', room, 'via', wsUrl);
 

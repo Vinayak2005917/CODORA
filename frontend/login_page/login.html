@@ -49,6 +49,9 @@
     </div>
 
     <script>
+        const local_endpoint = 'http://127.0.0.1:8000';
+        const production_endpoint = 'https://codora-vk5z.onrender.com';
+        const current_endpoint = production_endpoint;
         const loginForm = document.getElementById('login-form');
         const errorMessage = document.getElementById('error-message');
         const successMessage = document.getElementById('success-message');
@@ -93,7 +96,7 @@
 
             try {
                 console.log('Sending login request to backend...');
-                const response = await fetch('http://127.0.0.1:8000/api/auth/login/', {
+                const response = await fetch(`${current_endpoint}/api/auth/login/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

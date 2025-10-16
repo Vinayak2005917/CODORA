@@ -1,18 +1,3 @@
-# Python GUI Calculator using Tkinter
-
-This guide provides a simple calculator implementation using Python's Tkinter library. The calculator supports basic arithmetic operations and has a clean interface.
-
-## Features
-- **Basic Operations**: Addition, Subtraction, Multiplication, Division
-- **Clear Function**: Resets the display and calculations
-- **Responsive Design**: Grid-based layout for button arrangement
-- **Error Handling**: Basic protection against division by zero
-
----
-
-## Code Implementation
-
-```python
 import tkinter as tk
 
 # Initialize main window
@@ -113,20 +98,3 @@ for (text, row, col) in buttons:
 
 # Start the main loop
 root.mainloop()
-```
-
----
-
-## Customization Tips
-
-### Styling Elements
-- **Font Size**: Modify the `font` parameter in `Label` and `Button` widgets
-- **Colors**: Add `bg="color"` or `fg="color"` to buttons/label
-- **Padding**: Adjust `padx` and `pady` values in `grid()` calls
-
-### Advanced Features
-- Add scientific operations (sin, cos, etc.)
-- Implement scientific notation support
-- Add keyboard shortcuts
-
-Would you like me to add any specific features or improve any part of this implementation?

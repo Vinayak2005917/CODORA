@@ -1,6 +1,8 @@
 // Check authentication on page load
 let currentUser = null;
-
+const local_endpoint = 'http://127.0.0.1:8000';
+const production_endpoint = 'https://codora-vk5z.onrender.com';
+const current_endpoint = production_endpoint;
 async function checkAuth() {
     // Check if we recently authenticated (within last 2 seconds)
     const lastCheck = sessionStorage.getItem('last_auth_check');
@@ -17,7 +19,7 @@ async function checkAuth() {
     }
     
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/auth/me/', {
+        const response = await fetch(`${current_endpoint}/api/auth/me/`, {
             credentials: 'include'
         });
         
@@ -49,7 +51,7 @@ async function checkAuth() {
 
 async function createGuestSession() {
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/auth/guest/', {
+        const response = await fetch(`${current_endpoint}/api/auth/guest/`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -118,7 +120,7 @@ function updateUserUI() {
 
 async function logout() {
     try {
-        await fetch('http://127.0.0.1:8000/api/auth/logout/', {
+        await fetch(`${current_endpoint}/api/auth/logout/`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -137,7 +139,7 @@ async function loadProjects() {
     if (!grid) return;
 
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/projects/list/');
+        const response = await fetch(`${current_endpoint}/api/projects/list/`);
         
         if (!response.ok) {
             console.error('Failed to load projects');
@@ -245,7 +247,7 @@ function openProject(room, type) {
 // Fetch the latest project (most recently updated) from backend
 async function fetchLatestProject() {
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/projects/list/');
+        const response = await fetch(`${current_endpoint}/api/projects/list/`);
         if (!response.ok) {
             throw new Error('Failed to fetch projects list');
         }
@@ -285,7 +287,7 @@ async function joinByRoom() {
     }
     
     try {
-        const response = await fetch(`http://127.0.0.1:8000/api/projects/${room}/`);
+        const response = await fetch(`${current_endpoint}/api/projects/${room}/`);
         
         if (!response.ok) {
             alert('Project not found. Please check the room number.');
@@ -303,53 +305,32 @@ async function joinByRoom() {
     }
 }
 
-// Handle prompt input
-const promptInput = document.getElementById('promptInput');
-const goButton = document.querySelector('.btn-go');
-
-// Track selected project type
+// We'll initialize interactive elements after DOMContentLoaded to avoid null-query errors
 let selectedType = null;
-
-// Icon button handlers for type selection
-document.querySelector('.btn-document').addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    selectType('doc');
-});
-
-document.querySelector('.btn-code').addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    selectType('code');
-});
-
-document.querySelector('.btn-content').addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    selectType('lesson');
-});
 
 function selectType(type) {
     selectedType = type;
-    
+
     // Visual feedback - highlight selected button
     document.querySelectorAll('.btn-icon').forEach(btn => {
         btn.style.background = '';
         btn.style.border = '2px solid transparent';
     });
-    
+
     const typeMap = {
         'doc': '.btn-document',
+        'document': '.btn-document',
         'code': '.btn-code',
-        'lesson': '.btn-content'
+        'lesson': '.btn-content',
+        'content': '.btn-content'
     };
-    
+
     const selectedBtn = document.querySelector(typeMap[type]);
     if (selectedBtn) {
         selectedBtn.style.background = '#e0f2fe';
         selectedBtn.style.border = '2px solid #5eb3f6';
     }
-    
+
     console.log('Selected type:', type);
 }
 
@@ -375,8 +356,8 @@ async function processPrompt() {
     
     try {
         console.log('Creating project:', { type: selectedType, prompt }); // Debug log
-        
-        const response = await fetch('http://127.0.0.1:8000/api/projects/', {
+
+        const response = await fetch(`${current_endpoint}/api/projects/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -454,7 +435,7 @@ async function processPrompt() {
         }
     } catch (error) {
         console.error('Network error:', error);
-        alert('Failed to connect to backend. Make sure the server is running on http://127.0.0.1:8000\n\nError details: ' + error.message);
+        alert('Failed to connect to backend. Make sure the server is running on ${current_endpoint}\n\nError details: ' + error.message);
         // Re-enable button on error
         goButton.disabled = false;
         promptInput.disabled = false;
@@ -521,5 +502,56 @@ window.addEventListener('DOMContentLoaded', async () => {
             
             workspaceTitle.appendChild(joinBtn);
         }
+    }
+    
+    // Wire up prompt input and go button after DOM is ready
+    const promptInput = document.getElementById('promptInput');
+    const goButton = document.querySelector('.btn-go');
+
+    if (goButton && promptInput) {
+        goButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            processPrompt();
+        });
+
+        promptInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                processPrompt();
+            }
+        });
+    } else {
+        console.warn('Prompt input or Go button not found during initialization');
+    }
+
+    // Wire up type selection buttons safely
+    const docBtn = document.querySelector('.btn-document');
+    const codeBtn = document.querySelector('.btn-code');
+    const contentBtn = document.querySelector('.btn-content');
+
+    if (docBtn) {
+        docBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            selectType('doc');
+        });
+    }
+
+    if (codeBtn) {
+        codeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            selectType('code');
+        });
+    }
+
+    if (contentBtn) {
+        contentBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            selectType('lesson');
+        });
     }
 });

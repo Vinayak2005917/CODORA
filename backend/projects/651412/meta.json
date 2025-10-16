@@ -5,6 +5,6 @@
   "prompt": "Write a template for a holiday application",
   "owner": "Vinayak",
   "created_at": "2025-10-14T22:06:05.846540",
-  "updated_at": "2025-10-14T22:06:05.846540",
-  "preview": "Holiday Application Template Employee Information - Name: [Your Full Name] - Position: [Your Job Title] - Contact Information: [Email/Phone Number] --- Date of Application [Insert Date] --- Recipient Information - Manager/HR Representative: [Name] - Department: [Department Name] --- Subject Request ..."
+  "updated_at": "2025-10-15T21:54:46.347173+00:00",
+  "preview": "<h1>Holiday Application Template</h1> <h2>Employee Information</h2> <ul> <li><strong>Name</strong>: [Your Full Name]  </li> <li><strong>Position</strong>: [Your Job Title]  </li> <li><strong>Contact Information</strong>: [Email/Phone Number]</li> </ul> <hr> <h2>Date of Application</h2> <p>[Insert Da..."
 }

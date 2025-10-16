@@ -3,6 +3,10 @@ let versions = [];
 let currentUser = null;
 let currentVersionId = null; // track which version is currently loaded/active
 
+const local_endpoint = 'http://127.0.0.1:8000';
+const production_endpoint = 'https://codora-vk5z.onrender.com';
+const current_endpoint = production_endpoint;
+
 // Render timeline dynamically
 async function renderVersionHistory() {
   const container = document.getElementById("versionHistory");
@@ -519,7 +523,7 @@ function ensureFloatingPrompt() {
         return;
       }
 
-      const endpoint = `http://127.0.0.1:8000/api/projects/${room}/ai_prompt_commit/`;
+      const endpoint = `${current_endpoint}/api/projects/${room}/ai_prompt_commit/`;
       const resp = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
@@ -638,8 +642,8 @@ if (downloadPdfBtn) {
     }
 
     try {
-      // Call Django backend directly (default dev server at 127.0.0.1:8000)
-      const resp = await fetch(`http://127.0.0.1:8000/api/projects/${room}/download_pdf/`, {
+      // Call Django backend directly 
+      const resp = await fetch(`${current_endpoint}/api/projects/${room}/download_pdf/`, {
         credentials: 'include'
       });
       if (!resp.ok) {
