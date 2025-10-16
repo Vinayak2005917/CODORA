@@ -3,6 +3,9 @@ let currentUser = null;
 const local_endpoint = 'http://127.0.0.1:8000';
 const production_endpoint = 'https://codora-vk5z.onrender.com';
 const current_endpoint = production_endpoint;
+// Defer DOM element references until after DOMContentLoaded to avoid null reference errors
+let promptInput = null;
+let goButton = null;
 async function checkAuth() {
     // Check if we recently authenticated (within last 2 seconds)
     const lastCheck = sessionStorage.getItem('last_auth_check');
@@ -139,7 +142,11 @@ async function loadProjects() {
     if (!grid) return;
 
     try {
-        const response = await fetch(`${current_endpoint}/api/projects/list/`);
+        console.log('loadProjects: fetching projects from', current_endpoint, 'navigator.onLine=', navigator.onLine);
+        const fetchOptions = { headers: { 'Accept': 'application/json' }, mode: 'cors' };
+        console.log('loadProjects: fetch options:', fetchOptions);
+        const response = await fetch(`${current_endpoint}/api/projects/list/`, fetchOptions);
+        console.log('loadProjects: fetch completed, response.ok=', response.ok, 'status=', response.status);
         
         if (!response.ok) {
             console.error('Failed to load projects');
@@ -152,6 +159,10 @@ async function loadProjects() {
         renderProjects(projects);
     } catch (error) {
         console.error('Error loading projects:', error);
+        // Provide more diagnostic hints for common issues
+        console.error('Diagnostic: current_endpoint=', current_endpoint);
+        console.error('Diagnostic: navigator.onLine=', navigator.onLine);
+        console.error('If this is a CORS error, check that the backend includes Access-Control-Allow-Origin and, when using credentials, Access-Control-Allow-Credentials.');
     }
 }
 
@@ -353,7 +364,7 @@ async function processPrompt() {
     promptInput.disabled = true;
     goButton.textContent = '✨ Processing...';
     goButton.style.opacity = '0.7';
-    
+
     try {
         console.log('Creating project:', { type: selectedType, prompt }); // Debug log
 
@@ -380,16 +391,7 @@ async function processPrompt() {
             goButton.style.opacity = '1';
             goButton.style.backgroundColor = '#10b981';
 
-            // Prefer backend-provided redirect if present
-            if (data.redirect) {
-                console.log('🚀 Redirecting to backend-provided URL:', data.redirect);
-                setTimeout(() => {
-                    window.location.href = data.redirect;
-                }, 500);
-                return;
-            }
-
-            // If backend did not provide a redirect, fetch the latest projects and redirect to the newest one
+            // Always fetch the latest project and redirect to its room
             try {
                 const latest = await fetchLatestProject();
                 if (latest && latest.room) {
@@ -444,19 +446,7 @@ async function processPrompt() {
     }
 }
 
-goButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    processPrompt();
-});
-
-promptInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        processPrompt();
-    }
-});
+// NOTE: event listeners for promptInput and goButton are attached after DOMContentLoaded
 
 // Initialize - guard against multiple executions using sessionStorage
 window.addEventListener('DOMContentLoaded', async () => {
@@ -505,16 +495,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Wire up prompt input and go button after DOM is ready
-    const promptInput = document.getElementById('promptInput');
-    const goButton = document.querySelector('.btn-go');
+    promptInput = document.getElementById('promptInput');
+    goButton = document.querySelector('.btn-go');
 
-    if (goButton && promptInput) {
+    if (goButton) {
         goButton.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             processPrompt();
         });
+    }
 
+    if (promptInput) {
         promptInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -522,8 +514,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                 processPrompt();
             }
         });
-    } else {
-        console.warn('Prompt input or Go button not found during initialization');
     }
 
     // Wire up type selection buttons safely

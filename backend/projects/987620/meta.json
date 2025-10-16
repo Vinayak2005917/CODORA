@@ -1,9 +1,0 @@
-{
-  "room": "987620",
-  "type": "doc",
-  "title": "Theory of Computation: Automata",
-  "prompt": "Give me Notes on Theroy of Computation's Automata",
-  "created_at": "2025-10-15T16:05:37.172860",
-  "updated_at": "2025-10-15T16:05:37.172860",
-  "preview": "Theory of Computation: Automata Automata theory is a foundational area in theory of computation that studies abstract machines and the problems they can solve. It provides a framework to understand computability, language recognition, and computational limits. Below are key concepts and notes organi..."
-}

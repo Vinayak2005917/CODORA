@@ -14,6 +14,9 @@ from .project_store import project_store
 from .models import User
 from django.http import HttpResponse, FileResponse
 from io import BytesIO
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
 try:
     # optional dependency: markdown_pdf

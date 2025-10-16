@@ -1,8 +1,0 @@
-{
-  "id": "20251015201034554851",
-  "room": "914529",
-  "message": "AI: Keep it simple Markdown tho",
-  "author": "AI",
-  "timestamp": "2025-10-15T20:10:34.554851+00:00",
-  "content": "```markdown\n# Turing Machines Explained  \n\n## What It Is  \nA theoretical machine by Alan Turing to model any computation.  \n- Infinite tape (any symbols)  \n- Head: reads/writes + moves  \n- States: rules for actions  \n\n## Core Idea  \nSimplest rules → can do anything a real computer can.  \n\n## Example: Add 1 to Binary  \n**Start:** `101`  \n**End:** `110`  \n\n**Steps:**  \n1. Flip trailing 1s to 0s  \n2. Change first 0 to 1  \n\n## Why It Matters  \nAbstracts real computers – shows basic logic can compute anything.  \n```\n"
-}

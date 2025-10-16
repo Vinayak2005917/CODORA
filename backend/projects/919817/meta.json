@@ -1,9 +1,0 @@
-{
-  "room": "919817",
-  "type": "doc",
-  "title": "Introduction to Algorithms: Summary of Chapter 1",
-  "prompt": "Write a detailed summary of the first chapter of Introduction to Algorithms",
-  "created_at": "2025-10-15T16:13:57.204803",
-  "updated_at": "2025-10-15T16:13:57.204803",
-  "preview": "Introduction to Algorithms: Summary of Chapter 1 What is an Algorithm? The first chapter of Introduction to Algorithms (CLRS) begins by defining what an algorithm is. An algorithm is a well-defined procedure or set of instructions designed to solve a specific problem or perform a computation. It is ..."
-}
