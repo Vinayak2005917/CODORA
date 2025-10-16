@@ -270,6 +270,22 @@ body {
 .copy-icon {
   position: absolute;
   top: 15px;
+  right: 50px;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  cursor: pointer;
+}
+
+.delete-icon {
+  position: absolute;
+  top: 15px;
   right: 15px;
   width: 30px;
   height: 30px;
@@ -283,7 +299,8 @@ body {
   cursor: pointer;
 }
 
-.project-card:hover .copy-icon {
+.project-card:hover .copy-icon,
+.project-card:hover .delete-icon {
   opacity: 1;
 }
 

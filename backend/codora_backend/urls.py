@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/projects/', views.create_project, name='create_project'),  # POST
     path('api/projects/list/', views.list_projects, name='list_projects'),  # GET
     path('api/projects/<str:room>/', views.get_project, name='get_project'),  # GET
+    path('api/projects/<str:room>/delete/', views.delete_project, name='delete_project'),  # DELETE
     path('api/projects/<str:room>/download_pdf/', views.download_project_pdf, name='download_project_pdf'),
     path('api/projects/<str:room>/commit/', views.commit_version, name='commit_version'),
     path('api/projects/<str:room>/versions/', views.list_versions_view, name='list_versions'),

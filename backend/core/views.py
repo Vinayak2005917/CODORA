@@ -267,7 +267,7 @@ def process_prompt(request):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments"
+                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments. never user ``` NEVER!"
                     },
                     {
                         "role": "user",
@@ -348,7 +348,7 @@ def create_project(request):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments"
+                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments. never user ``` NEVER!"
                     },
                     {
                         "role": "user",
@@ -444,7 +444,7 @@ def ai_prompt_commit(request, room):
         # Compose system + content + user prompt
         system_msg = (
             "You are a helpful AI assistant named CODORA AI, used to edit and improve documents and code. "
-            "When asked for Document or text responses use Markdown formatting. When asked for code, return code blocks only."
+            "When asked for Document or text responses use Markdown formatting. When asked for code, return code blocks only. never user ``` NEVER!"
         )
 
         user_message = f"Current file content:\n```\n{code_only}\n```\n\nUser request:\n{prompt}"
@@ -560,6 +560,25 @@ def get_project(request, room):
             'preview': project['preview'],
             'content': project['content']
         })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["DELETE"])
+def delete_project(request, room):
+    """
+    Delete a project by room number.
+    
+    Response: { "ok": true } or { "error": "..." }
+    """
+    try:
+        success = project_store.delete_project(room)
+        
+        if not success:
+            return JsonResponse({'error': 'Project not found or could not be deleted'}, status=404)
+        
+        return JsonResponse({'ok': True})
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
