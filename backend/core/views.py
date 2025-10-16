@@ -15,6 +15,7 @@ from .models import User
 from django.http import HttpResponse, FileResponse
 from io import BytesIO
 from dotenv import load_dotenv
+from django.db import IntegrityError
 import os
 load_dotenv()
 
@@ -122,17 +123,24 @@ def login_view(request):
                 return JsonResponse({'error': 'Invalid password'}, status=401)
             
             # User doesn't exist - auto-register
-            import random
-            user = User.objects.create_user(
-                username=username,
-                email=f"{username}@codora.local",  # Auto-generate email
-                password=password
-            )
-            # Assign random avatar color
-            colors = ['#5eb3f6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899']
-            user.avatar_color = random.choice(colors)
-            user.save()
-            created = True
+            try:
+                import random
+                user = User.objects.create_user(
+                    username=username,
+                    email=f"{username}@codora.local",  # Auto-generate email
+                    password=password
+                )
+                # Assign random avatar color
+                colors = ['#5eb3f6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899']
+                user.avatar_color = random.choice(colors)
+                user.save()
+                created = True
+            except IntegrityError:  # Handle UNIQUE constraint violations
+                # If creation fails due to duplicate (e.g., race condition), try authenticating again
+                user = authenticate(request, username=username, password=password)
+                if user is None:
+                    return JsonResponse({'error': 'Username already exists or invalid credentials'}, status=400)
+                created = False  # Existing user
         
         # Log the user in
         login(request, user)
