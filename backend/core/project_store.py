@@ -69,9 +69,13 @@ class ProjectStore:
         Returns:
             Dict with room, path, type, and other metadata
         """
+        print(f"DEBUG: Creating project with type={project_type}, prompt length={len(prompt)}")
         room = self.generate_room()
+        print(f"DEBUG: Generated room: {room}")
         room_path = self.get_project_path(room)
+        print(f"DEBUG: Room path: {room_path}")
         room_path.mkdir(parents=True, exist_ok=True)
+        print(f"DEBUG: Created directory: {room_path.exists()}")
         
         # Generate title if not provided
         if not title:
@@ -80,6 +84,8 @@ class ProjectStore:
             title = first_line.replace('#', '').strip()[:50]
             if not title:
                 title = prompt[:50] if prompt else f"Project {room}"
+        
+        print(f"DEBUG: Generated title: {title}")
         
         # Create metadata
         now = datetime.utcnow().isoformat()
@@ -95,15 +101,18 @@ class ProjectStore:
         
         # Save metadata
         meta_path = room_path / 'meta.json'
+        print(f"DEBUG: Saving meta to: {meta_path}")
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
         
         # Save content
         content_filename = self.get_content_filename(project_type)
         content_path = room_path / content_filename
+        print(f"DEBUG: Saving content to: {content_path}")
         with open(content_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
+        print(f"DEBUG: Project created successfully: {room}")
         return {
             'room': room,
             'type': project_type,
