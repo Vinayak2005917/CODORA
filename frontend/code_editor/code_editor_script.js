@@ -345,3 +345,50 @@ if (saveBtn) {
     );
   });
 }
+
+// --- Run button behavior ---
+function showRunOutput(outputText) {
+  let panel = document.getElementById('runOutputPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'runOutputPanel';
+    panel.className = 'run-output';
+    panel.innerHTML = `
+      <div class="run-header">
+        <div>Run Output</div>
+        <button class="close-run" id="closeRunBtn">Close</button>
+      </div>
+      <pre id="runOutputPre"></pre>
+    `;
+    document.body.appendChild(panel);
+    document.getElementById('closeRunBtn').addEventListener('click', () => panel.remove());
+  }
+  const pre = document.getElementById('runOutputPre');
+  if (pre) pre.textContent = outputText;
+  panel.style.display = 'block';
+}
+
+function runCodeSimulation() {
+  const code = editor ? editor.value : '';
+  // Very small simulation: echo back first 1000 chars and pretend it's output
+  const snippet = code ? code.substring(0, 1000) : '<no code to run>';
+  const now = new Date().toLocaleTimeString();
+  const output = `=== Run at ${now} ===\n\n${snippet}\n\n=== End ===`;
+  showRunOutput(output);
+}
+
+// Attach run button + keyboard shortcut
+window.addEventListener('DOMContentLoaded', () => {
+  const runBtn = document.getElementById('runButton');
+  if (runBtn) runBtn.addEventListener('click', runCodeSimulation);
+
+  // Ctrl+Enter to run
+  if (editor) {
+    editor.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runCodeSimulation();
+      }
+    });
+  }
+});
