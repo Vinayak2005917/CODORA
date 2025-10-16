@@ -446,7 +446,19 @@ async function processPrompt() {
     }
 }
 
+<<<<<<< HEAD
 // NOTE: event listeners for promptInput and goButton are attached after DOMContentLoaded
+=======
+
+
+promptInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        processPrompt();
+    }
+});
+>>>>>>> c7191b5ac07b442ba7a2d3594ef7a4c3f062bb78
 
 // Initialize - guard against multiple executions using sessionStorage
 window.addEventListener('DOMContentLoaded', async () => {
