@@ -444,11 +444,7 @@ async function processPrompt() {
     }
 }
 
-goButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    processPrompt();
-});
+
 
 promptInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
