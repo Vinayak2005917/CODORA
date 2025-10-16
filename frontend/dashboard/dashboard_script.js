@@ -206,6 +206,14 @@ function renderProjects(projects) {
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                 </div>
+                <div class="delete-icon" onclick="event.stopPropagation(); deleteProject('${project.room}')" title="Delete project">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </div>
                 <div class="project-preview ${project.type}">
                     <div style="font-size: 14px; color: #5eb3f6; margin-bottom: 8px; font-weight: 600;">${typeLabel}</div>
                     <div style="font-size: 12px; color: #999; margin-bottom: 8px;">Room: ${project.room}</div>
@@ -282,6 +290,32 @@ function copyRoomNumber(room) {
     }).catch(err => {
         console.error('Failed to copy:', err);
     });
+}
+
+// Delete project
+async function deleteProject(room) {
+    if (!confirm(`Are you sure you want to delete project ${room}? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${current_endpoint}/api/projects/${room}/delete/`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            alert(`Project ${room} has been deleted.`);
+            // Reload projects list
+            loadProjects();
+        } else {
+            const data = await response.json();
+            alert(`Failed to delete project: ${data.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Delete project error:', error);
+        alert('Network error. Please try again.');
+    }
 }
 
 // Join project by room number

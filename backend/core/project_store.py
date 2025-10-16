@@ -295,6 +295,19 @@ class ProjectStore:
         except Exception:
             return None
 
+    def delete_project(self, room: str) -> bool:
+        """Delete an entire project directory. Returns True if deleted, False otherwise."""
+        project_path = self.get_project_path(room)
+        if not project_path.exists():
+            return False
+        
+        try:
+            import shutil
+            shutil.rmtree(project_path)
+            return True
+        except Exception:
+            return False
+
     def delete_version(self, room: str, version_id: str) -> bool:
         """Delete a version file. Returns True if deleted, False otherwise."""
         versions_path = self.get_project_path(room) / 'versions'
