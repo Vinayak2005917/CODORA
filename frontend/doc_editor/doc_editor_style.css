@@ -334,7 +334,7 @@ body {
 /* New layout: collaborators on top, chat on bottom, each half height */
 .collaborators-section,
 .chat-section {
-  flex: 1 1 50%;
+  flex: 1 1 40%;
   padding: 16px;
   /* use hidden here; inner areas will scroll independently */
   overflow: hidden;
@@ -343,8 +343,13 @@ body {
 
 /* make chat section a column flex container so input can stick to the bottom */
 .chat-section {
+  /* make chat section taller than collaborators by increasing its flex-grow
+     relative to the collaborators section; specific tweak below will set a
+     larger flex when both are present. */
   display: flex;
   flex-direction: column;
+  /* make chat take more vertical space than collaborators */
+  flex: 2 1 60%;
 }
 
 .chat-title {
@@ -360,6 +365,11 @@ body {
   padding: 8px;
   background: #f8fafc;
   border-radius: 8px;
+}
+
+/* Ensure right sidebar fills viewport height so chat can expand */
+.right-sidebar {
+  min-height: 100vh;
 }
 
 .chat-message {

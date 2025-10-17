@@ -803,7 +803,7 @@ const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 if (chatSendBtn && chatInput) {
   chatSendBtn.addEventListener('click', (e) => { e.preventDefault(); sendChatMessage(); });
-  chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
+  chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
 }
 
 // Chat is handled in the central ws.onmessage handler above; no additional
