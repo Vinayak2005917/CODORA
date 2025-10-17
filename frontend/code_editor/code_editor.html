@@ -15,8 +15,8 @@
         <div class="left-sidebar">
             <div class="user-section">
                 <div class="user-profile">
-                    <div class="user-avatar"><img src="../Codoro_logo.png" alt="Codora Fox Logo"></div>
-                    <span style="font-weight: 700; font-size: 27px; letter-spacing: 1px;">CODORA</span>
+                    <div class="user-avatar"><a href="../dashboard/dashboard.html"><img src="../Codoro_logo.png" alt="Codora Fox Logo"></a></div>
+                    <a href="../dashboard/dashboard.html" style="text-decoration:none;color:inherit;"><span style="font-weight: 700; font-size: 27px; letter-spacing: 1px;">CODORA</span></a>
                 </div>
                 <input type="text" class="commit-input" placeholder="Commit Message here..." id="commitMessage">
                 <button class="commit-btn" onclick="addCommit()">commit</button>
@@ -66,28 +66,19 @@
 
         <!-- right sidebar -->
         <div class="right-sidebar">
-            <h3 class="collaborators-title">Collaborators:</h3>
-            <div id="collaboratorsList"></div>
-            <!---
-            <div class="activity-section">
-                <h4 class="activity-title">
-                    <span>🕐</span>
-                    Recent Activity
-                </h4>
-                <div class="activity-item">
-                    <span>🔀</span>
-                    <span>User 1 committed changes</span>
-                </div>
-                <div class="activity-item">
-                    <span>📄</span>
-                    <span>AI generated new content</span>
-                </div>
-                <div class="activity-item">
-                    <span>👤</span>
-                    <span>User 2 joined session</span>
-                </div>
-                --->
+            <div class="collaborators-section">
+                <h3 class="collaborators-title">Collaborators:</h3>
+                <div id="collaboratorsList"></div>
             </div>
+            <div class="chat-section">
+                <h3 class="chat-title">Chat</h3>
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input-row">
+                    <input id="chatInput" type="text" placeholder="Type a message...">
+                    <button id="chatSendBtn">Send</button>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
     <!-- js file -->
