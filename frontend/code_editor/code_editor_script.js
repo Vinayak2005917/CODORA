@@ -14,16 +14,22 @@ const current_endpoint = production_endpoint;
 
 async function renderVersionHistory() {
   const container = document.getElementById("versionHistory");
-  if (!container) return;
+  if (!container) {
+    console.log('renderVersionHistory: container not found');
+    return;
+  }
   try {
+    console.log('renderVersionHistory: starting, ws exists:', !!ws, 'readyState:', ws ? ws.readyState : 'no ws');
     container.innerHTML = '<div style="padding:16px;color:#6b7280">Loading versions…</div>';
     if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log('renderVersionHistory: WebSocket is open, sending list_versions');
       ws.send(JSON.stringify({ type: 'list_versions' }));
     } else {
+      console.log('renderVersionHistory: WebSocket not open, showing not connected');
       container.innerHTML = '<div style="padding:16px;color:#6b7280">Not connected</div>';
     }
   } catch (e) {
-    console.error('Failed to request versions', e);
+    console.error('renderVersionHistory: Failed to request versions', e);
     container.innerHTML = '<div style="padding:16px;color:#6b7280">Failed to fetch versions</div>';
   }
 }
@@ -46,6 +52,7 @@ async function addCommit() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  console.log('DOMContentLoaded: Initializing version history');
   renderVersionHistory();
   const commitBtn = document.querySelector(".commit-btn");
   if (commitBtn) commitBtn.addEventListener("click", addCommit);
@@ -223,16 +230,22 @@ const clientId =
 let ws;
 
 function connectWS() {
+  console.log('connectWS: Attempting to connect to', wsUrl);
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
+    console.log('WebSocket: Connection opened');
     if (connStatus) {
       connStatus.textContent = "🟢Connected";
       connStatus.style.color = "#16a34a";
     }
+    // Try to load versions now that we're connected
+    console.log('WebSocket: Connection opened, calling renderVersionHistory');
+    renderVersionHistory();
   };
 
   ws.onclose = () => {
+    console.log('WebSocket: Connection closed');
     if (connStatus) {
       connStatus.textContent = "⛔Disconnected";
       connStatus.style.color = "#dc2626";
@@ -243,8 +256,16 @@ function connectWS() {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      console.log('WebSocket: Received message type:', data.type, data);
       if (data.type === "edit") {
-        const content = data.content || "";
+        let content = data.content || "";
+        // Unwrap code blocks: replace each ```...``` with the inner code, preserving any text before/after
+        const codeBlockRegex = /```[\w]*\n?([\s\S]*?)\n?```/g;
+        try {
+          content = content.replace(codeBlockRegex, (m, inner) => (inner || '').trim());
+        } catch (e) {
+          console.warn('Failed to unwrap code blocks for edit message', e);
+        }
         if (editor.value !== content) {
           editor.value = content;
         }
@@ -270,6 +291,127 @@ function connectWS() {
           showNotification(`${data.user.username} joined`, "success");
         } else if (data.type === "user_left") {
           showNotification(`${data.user.username} left`, "info");
+        }
+      }
+      if (data.type === 'versions_list') {
+        console.log('WebSocket: Received versions_list', data);
+        // Received versions list from server, render into version history
+        const container = document.getElementById('versionHistory');
+        const list = data.versions || [];
+        console.log('WebSocket: versions_list contains', list.length, 'versions');
+        // Normalize and sort versions newest-first by timestamp
+        versions = (list || []).slice().sort((a,b) => {
+          try { return new Date(b.timestamp) - new Date(a.timestamp); } catch(e) { return 0; }
+        });
+        // If no version selected yet, default to the most recent (first) version
+        const wasVersionSelected = !!currentVersionId;
+        if (!currentVersionId && versions.length > 0) currentVersionId = versions[0].id;
+        
+        // If this is the first time loading versions and we have versions, auto-load the most recent one
+        if (!wasVersionSelected && versions.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+          console.log('Auto-loading most recent version:', currentVersionId);
+          ws.send(JSON.stringify({ type: 'get_version', version_id: currentVersionId }));
+        }
+        if (!container) return;
+        container.innerHTML = versions.length === 0 
+          ? '<div style="padding:16px;color:#6b7280;text-align:center;">No versions yet</div>'
+          : versions.map((v) => {
+              // format time safely (assume UTC timestamps)
+              let ts = '';
+              try { ts = new Date(v.timestamp).toLocaleString(); } catch(e) { ts = v.timestamp; }
+              const authorLabel = (currentUser && v.author === currentUser.username) ? `${escapeHtml(v.author)} (you)` : escapeHtml(v.author || 'User');
+              const isCurrent = currentVersionId === v.id;
+              return `
+              <div class="timeline-item ${isCurrent ? 'selected' : ''}" data-version-id="${v.id}" onclick="loadVersion('${v.id}')" style="position:relative;">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                  <div class="timeline-title">${escapeHtml(v.message || '(no message)')}</div>
+                  <div class="timeline-meta">${ts}</div>
+                  <div class="timeline-meta">by ${authorLabel}</div>
+                </div>
+                <button class="delete-version-btn" data-version-id="${v.id}" title="Delete" style="position:absolute;right:8px;top:8px;background:transparent;border:none;cursor:pointer;">
+                  <!-- trash icon -->
+                  <img src="icons8-delete-512.svg" alt="Delete" width="18" height="18" />
+                </button>
+                ${isCurrent ? '<div class="current-indicator" style="position:absolute;left:-25px;top:8px;">-></div>' : ''}
+              </div>
+              `;
+            }).join('');
+
+        // Attach click handlers
+        // Click to load
+        container.querySelectorAll('.timeline-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const vid = item.getAttribute('data-version-id');
+            if (!vid) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ type: 'get_version', version_id: vid }));
+            // optimistic highlight
+            currentVersionId = vid;
+            // re-render highlight
+            renderVersionHistory();
+          });
+        });
+
+        // Delete buttons
+        container.querySelectorAll('.delete-version-btn').forEach(btn => {
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const vid = btn.getAttribute('data-version-id');
+            if (!vid) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+              alert('Not connected');
+              return;
+            }
+            if (!confirm('Delete this commit? This action cannot be undone.')) return;
+            ws.send(JSON.stringify({ type: 'delete_version', version_id: vid }));
+          });
+        });
+      }
+      if (data.type === 'version_data') {
+        if (data.version && data.version.content) {
+          // Unwrap code blocks: replace all ```...``` with the inner content while keeping text before/after
+          let content = data.version.content;
+          const codeBlockRegex = /```[\w]*\n?([\s\S]*?)\n?```/g;
+          try {
+            content = content.replace(codeBlockRegex, (m, inner) => (inner || '').trim());
+          } catch (e) {
+            console.warn('Failed to unwrap code blocks for version_data', e);
+          }
+          // Load the extracted content into the editor
+          if (editor) {
+            editor.value = content;
+          }
+        } else if (data.error) {
+          alert('Version not found');
+        }
+      }
+      if (data.type === 'version_committed') {
+        // Handle successful commit
+        if (data.version) {
+          showNotification('Version saved', 'success');
+          currentVersionId = data.version.id;
+          // Refresh versions list
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'list_versions' }));
+          }
+        } else {
+          showNotification('Failed to save version', 'error');
+        }
+      }
+      if (data.type === 'version_deleted') {
+        if (data.ok && data.version_id) {
+          showNotification('Version deleted', 'success');
+          // If the deleted version was current, reset to latest
+          if (currentVersionId === data.version_id) {
+            currentVersionId = versions.length > 0 ? versions[0].id : null;
+          }
+          // Refresh versions list
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'list_versions' }));
+          }
+        } else {
+          showNotification('Failed to delete version', 'error');
         }
       }
     } catch (e) {
@@ -316,6 +458,7 @@ function showNotification(message, type = "info") {
 }
 
 connectWS();
+console.log('connectWS: Initial connection attempt made');
 
 // Debounced send of edits
 let editTimeout;
@@ -347,6 +490,19 @@ if (saveBtn) {
 }
 
 // --- Run button behavior ---
+
+function loadVersion(versionId) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Not connected to server');
+        return;
+    }
+    ws.send(JSON.stringify({ type: 'get_version', version_id: versionId }));
+    // optimistic highlight
+    currentVersionId = versionId;
+    // re-render highlight
+    renderVersionHistory();
+}
+
 function showRunOutput(outputText) {
   let panel = document.getElementById('runOutputPanel');
   if (!panel) {

@@ -362,11 +362,13 @@ def create_project(request):
             return JsonResponse({'error': f'API Error: {str(api_error)}'}, status=500)
         
         # Create project
+        print(f"DEBUG: About to create project with type={project_type}")
         project = project_store.create_project(
             project_type=project_type,
             prompt=prompt,
             content=ai_response
         )
+        print(f"DEBUG: Project created: {project}")
         
         # Determine redirect URL based on type
         editor_map = {
