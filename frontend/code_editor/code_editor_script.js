@@ -10,7 +10,7 @@ function escapeHtml(s) {
 
 const local_endpoint = 'http://127.0.0.1:8000';
 const production_endpoint = 'https://codora-vk5z.onrender.com';
-const current_endpoint = local_endpoint;
+const current_endpoint = production_endpoint;
 
 async function renderVersionHistory() {
   const container = document.getElementById("versionHistory");
