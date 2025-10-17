@@ -2,7 +2,7 @@
 let currentUser = null;
 const local_endpoint = 'http://127.0.0.1:8000';
 const production_endpoint = 'https://codora-vk5z.onrender.com';
-const current_endpoint = production_endpoint;
+const current_endpoint = local_endpoint;
 // Defer DOM element references until after DOMContentLoaded to avoid null reference errors
 let promptInput = null;
 let goButton = null;

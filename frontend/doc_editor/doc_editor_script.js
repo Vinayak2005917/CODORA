@@ -5,7 +5,7 @@ let currentVersionId = null; // track which version is currently loaded/active
 
 const local_endpoint = 'http://127.0.0.1:8000';
 const production_endpoint = 'https://codora-vk5z.onrender.com';
-const current_endpoint = production_endpoint;
+const current_endpoint = local_endpoint;
 
 // Render timeline dynamically
 async function renderVersionHistory() {
@@ -230,54 +230,22 @@ function connect() {
   };
 
   ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === "edit") {
-        let content = String(data.content ?? "");
+      let data = null;
+      try {
+        data = JSON.parse(event.data);
+        if (data.type === "edit") {
+          // Process edits quickly and defer heavy markdown parsing/highlighting.
+          const raw = String(data.content ?? "");
 
-        // If server sent full HTML (starts with <html or <div etc.), just drop it in.
-        const looksHtml = /^\s*<[^>]+>/.test(content);
-
-        if (!looksHtml && typeof marked !== "undefined") {
-          // Unwrap top-level fenced code blocks if the whole payload is fenced
-          // ```lang\n...\n```
-          const fencedBlock = /^\s*```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```\s*$/.exec(content);
-          if (fencedBlock) {
-            content = fencedBlock[1];
+          // If raw looks like HTML, update immediately (fast path).
+          const looksHtml = /^\s*<[^>]+>/.test(raw);
+          if (looksHtml) {
+            if (editor.innerHTML !== raw) editor.innerHTML = raw;
+          } else {
+            // Debounce and schedule parsing of the latest content on idle.
+            scheduleParseAndRender(raw);
           }
-
-          // Configure marked once
-          marked.setOptions({
-            breaks: true,
-            gfm: true,
-            headerIds: true,
-            mangle: false
-          });
-
-          try {
-            content = marked.parse(content);
-          } catch (e) {
-            console.warn("Markdown parse failed, falling back to plain text", e);
-            content = content
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/\n/g, "<br>");
-          }
-
-          // Syntax highlight after DOM update
-          setTimeout(() => {
-            if (typeof hljs !== "undefined") {
-              document.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightElement(block);
-              });
-            }
-          }, 50);
         }
-
-        // Update editor HTML only if changed
-        if (editor.innerHTML !== content) editor.innerHTML = content;
-      }
       if (data.type === 'versions_list') {
         // Received versions list from server, render into timeline
         const container = document.getElementById('versionHistory');
@@ -356,6 +324,36 @@ function connect() {
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'list_versions' }));
       }
 
+      if (data.type === 'chat_ack') {
+        console.log('[CHAT ACK RECV]', data);
+        // Optionally show a tiny UI confirmation; for now just log it
+      }
+
+      if (data.type === 'chat_history') {
+        try {
+          const msgs = data.messages || [];
+          console.log('[CHAT HISTORY] count=', msgs.length);
+          msgs.forEach(m => {
+            const username = m.username || 'User';
+            const text = m.message || m.text || '';
+            const ts = m.timestamp || new Date().toISOString();
+            const isMe = currentUser && username === currentUser.username;
+            renderChatMessage({ username, text, timestamp: ts, isMe });
+          });
+        } catch (e) {
+          console.warn('Failed to render chat history', e);
+        }
+      }
+
+      if (data.type === 'chat') {
+        const username = data.username || (data.user && data.user.username) || 'User';
+        const text = data.message || data.text || '';
+        const ts = data.timestamp || new Date().toISOString();
+        const isMe = currentUser && username === currentUser.username;
+        console.log('[CHAT INCOMING]', 'room=', room, 'username=', username, 'text=', text, 'isMe=', isMe);
+        renderChatMessage({ username, text, timestamp: ts, isMe });
+      }
+
       if (data.type === 'version_data') {
         const v = data.version;
         if (!v) {
@@ -397,6 +395,8 @@ function connect() {
     } catch (e) {
       console.warn("WS message parse error", e);
     }
+
+    if (!data) return;
 
     if (data.type === 'me') {
       currentUser = data.user;
@@ -619,6 +619,62 @@ editor.addEventListener("input", () => {
   }, 200);
 });
 
+// Parsing scheduler: keeps only the latest content and parses it on idle to avoid blocking the WS message handler.
+let _scheduledContent = null;
+let _parseTimeout = null;
+function scheduleParseAndRender(content) {
+  _scheduledContent = content;
+  // If requestIdleCallback is available, use it; otherwise batch with setTimeout.
+  if (typeof window.requestIdleCallback === 'function') {
+    try {
+      window.requestIdleCallback(() => {
+        const c = _scheduledContent;
+        _scheduledContent = null;
+        _doParseAndRender(c);
+      }, { timeout: 200 });
+      return;
+    } catch (e) {
+      // fall through to setTimeout fallback
+    }
+  }
+  clearTimeout(_parseTimeout);
+  _parseTimeout = setTimeout(() => {
+    const c = _scheduledContent;
+    _scheduledContent = null;
+    _doParseAndRender(c);
+  }, 50);
+}
+
+function _doParseAndRender(raw) {
+  if (raw == null) return;
+  let content = raw;
+  if (typeof marked !== 'undefined') {
+    // Unwrap fenced block if present
+    const fencedBlock = /^\s*```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```\s*$/.exec(content);
+    if (fencedBlock) content = fencedBlock[1];
+
+    try {
+      marked.setOptions({ breaks: true, gfm: true, headerIds: true, mangle: false });
+      content = marked.parse(content);
+    } catch (e) {
+      console.warn('Markdown parse failed, falling back to plain text', e);
+      content = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    }
+  } else {
+    content = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  }
+
+  // Update DOM
+  if (editor.innerHTML !== content) editor.innerHTML = content;
+
+  // Highlight on next tick to avoid blocking
+  setTimeout(() => {
+    if (typeof hljs !== 'undefined') {
+      document.querySelectorAll('pre code').forEach((block) => { try { hljs.highlightElement(block); } catch (e) {} });
+    }
+  }, 30);
+}
+
 // Save button
 if (saveBtn) {
   saveBtn.addEventListener("click", () => {
@@ -668,3 +724,88 @@ if (downloadPdfBtn) {
     }
   });
 }
+
+// ---------------- Chat wiring (show username + message) ----------------
+// Renders a single chat message into the chat area.
+function renderChatMessage({ username = 'User', text = '', timestamp = null, isMe = false } = {}) {
+  const container = document.getElementById('chatMessages');
+  if (!container) return;
+
+  const msgEl = document.createElement('div');
+  msgEl.className = 'chat-message' + (isMe ? ' me' : ' other');
+
+  const avatar = document.createElement('div');
+  avatar.className = 'chat-avatar';
+  avatar.textContent = (username || 'U').charAt(0).toUpperCase();
+
+  const body = document.createElement('div');
+  body.className = 'chat-body';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'chat-username';
+  nameEl.textContent = username + (isMe ? ' (you)' : '');
+
+  const textEl = document.createElement('div');
+  textEl.className = 'chat-text';
+  textEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+
+  body.appendChild(nameEl);
+  body.appendChild(textEl);
+
+  msgEl.appendChild(avatar);
+  msgEl.appendChild(body);
+
+  container.appendChild(msgEl);
+  // auto-scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+
+// Ensure there's a display name for the current user. If ws provided one, it'll be used; otherwise prompt once and persist to localStorage.
+function ensureDisplayName() {
+  if (currentUser && currentUser.username) return currentUser.username;
+  let stored = window.localStorage.getItem('codora_display_name') || '';
+  if (!stored) {
+    stored = (window.prompt('Enter display name for chat (this will be saved locally):', 'You') || 'You').trim();
+    try { window.localStorage.setItem('codora_display_name', stored); } catch(e){}
+  }
+  currentUser = currentUser || {};
+  currentUser.username = stored;
+  return stored;
+}
+
+// Send chat message from input
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const username = ensureDisplayName();
+
+  // render locally as "me"
+  renderChatMessage({ username, text, timestamp: new Date().toISOString(), isMe: true });
+  console.log('[CHAT SEND] room=', room, 'username=', username, 'message=', text);
+  input.value = '';
+
+  // Send to server if connected (non-breaking if server doesn't handle it)
+  try {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'chat', username, message: text, timestamp: new Date().toISOString() }));
+    } else {
+      console.warn('[CHAT SEND] ws not open readyState=', ws ? ws.readyState : 'no-ws');
+    }
+  } catch (e) {
+    console.warn('Failed to send chat over WS', e);
+  }
+}
+
+// Attach handlers to chat input and button
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
+if (chatSendBtn && chatInput) {
+  chatSendBtn.addEventListener('click', (e) => { e.preventDefault(); sendChatMessage(); });
+  chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
+}
+
+// Chat is handled in the central ws.onmessage handler above; no additional
+// message event listeners or polling are attached to avoid duplicate renders.
+

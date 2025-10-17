@@ -4,6 +4,8 @@ from django.conf import settings
 import aiofiles
 from pathlib import Path
 from asgiref.sync import sync_to_async
+import uuid
+from datetime import datetime
 
 
 class EditorConsumer(AsyncWebsocketConsumer):
@@ -32,6 +34,10 @@ class EditorConsumer(AsyncWebsocketConsumer):
     
     # In-memory per-room users tracking (dict: room -> dict[channel_name -> user_info])
     room_users = {}
+    # In-memory per-room chat history cache
+    room_chat = {}
+    # In-memory per-room chat history cache (dict: room -> list[message objects])
+    room_chat = {}
 
     async def connect(self):
         # Extract room from URL path (defaults to "default" for backward compatibility)
@@ -142,6 +148,29 @@ class EditorConsumer(AsyncWebsocketConsumer):
             'user': self.user_info
         }))
         
+        # Send chat history to the just-connected client
+        try:
+            history = self.room_chat.get(self.room)
+            if history is None:
+                # Try to load from projects/<room>/chat.json
+                project_path = settings.BASE_DIR / 'projects' / self.room
+                chat_path = project_path / 'chat.json'
+                if chat_path.exists():
+                    try:
+                        async with aiofiles.open(chat_path, mode='r', encoding='utf-8') as f:
+                            txt = await f.read()
+                            history = json.loads(txt) if txt else []
+                    except Exception as e:
+                        print(f"Error loading chat history for {self.room}: {e}")
+                        history = []
+                else:
+                    history = []
+                self.room_chat[self.room] = history
+
+            await self.send(text_data=json.dumps({ 'type': 'chat_history', 'messages': history }))
+        except Exception as e:
+            print('chat history send error', e)
+
         # Broadcast user joined to all other clients in room
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -151,6 +180,8 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 "users": users_in_room
             }
         )
+        # Debug connect
+        print(f"[WS CONNECT] channel={self.channel_name} room={self.room} user={self.user_info.get('username')}")
 
     async def disconnect(self, close_code):
         # Remove user from room tracking
@@ -171,6 +202,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
             )
         
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        print(f"[WS DISCONNECT] channel={self.channel_name} room={self.room} code={close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
         if text_data is None:
@@ -360,6 +392,60 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 await self.send(text_data=json.dumps({'type': 'version_data', 'error': 'not found'}))
             return
 
+        # Chat messages (broadcast to room)
+        if msg_type == 'chat':
+            # Prefer server-side authenticated username when available
+            username = None
+            if hasattr(self, 'user_info') and self.user_info:
+                username = self.user_info.get('username')
+            if not username:
+                username = data.get('username', 'User')
+
+            message = data.get('message') or data.get('text') or ''
+            timestamp = data.get('timestamp') or datetime.utcnow().isoformat()
+
+            print(f"[CHAT RECEIVE] room={self.room} channel={self.channel_name} username={username} message={message}")
+
+            # Build canonical message object and append to in-memory history
+            msg_obj = {
+                'id': str(uuid.uuid4()),
+                'username': username,
+                'message': message,
+                'timestamp': timestamp,
+            }
+
+            try:
+                history = self.room_chat.get(self.room) or []
+                history.append(msg_obj)
+                self.room_chat[self.room] = history
+
+                # Persist to projects/<room>/chat.json if project exists
+                project_path = settings.BASE_DIR / 'projects' / self.room
+                chat_path = project_path / 'chat.json'
+                if project_path.exists():
+                    try:
+                        async with aiofiles.open(chat_path, mode='w', encoding='utf-8') as f:
+                            await f.write(json.dumps(history, ensure_ascii=False, indent=2))
+                    except Exception as e:
+                        print(f"[CHAT PERSIST ERROR] room={self.room} err={e}")
+            except Exception as e:
+                print(f"[CHAT HISTORY ERROR] room={self.room} err={e}")
+
+            # Broadcast chat message to everyone in room (include sender_channel so consumers can avoid echoing)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat.message',
+                    'id': msg_obj['id'],
+                    'username': username,
+                    'message': message,
+                    'timestamp': timestamp,
+                    'sender_channel': self.channel_name,
+                }
+            )
+            print(f"[CHAT BROADCAST] room={self.room} from={self.channel_name} id={msg_obj['id']}")
+            return
+
         # Ignore unknown message types
         return
 
@@ -400,6 +486,21 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    async def chat_message(self, event):
+        """Forward a chat.message event to the WebSocket client(s)."""
+        # If the event included the sender's channel, skip sending back to that same channel
+        sender = event.get('sender_channel')
+        if sender and sender == self.channel_name:
+            # don't echo back to the sender (the client shows optimistic UI)
+            return
+
+        await self.send(text_data=json.dumps({
+            'type': 'chat',
+            'username': event.get('username'),
+            'message': event.get('message'),
+            'timestamp': event.get('timestamp')
+        }))
 
     async def versions_list(self, event):
         """Broadcast the versions list to clients."""
