@@ -234,16 +234,40 @@ function connect() {
       try {
         data = JSON.parse(event.data);
         if (data.type === "edit") {
-          // Process edits quickly and defer heavy markdown parsing/highlighting.
-          const raw = String(data.content ?? "");
-
-          // If raw looks like HTML, update immediately (fast path).
-          const looksHtml = /^\s*<[^>]+>/.test(raw);
-          if (looksHtml) {
-            if (editor.innerHTML !== raw) editor.innerHTML = raw;
+          // Skip edits echoed from ourselves
+          if (data.clientId && data.clientId === clientId) {
+            // ignore echo
           } else {
-            // Debounce and schedule parsing of the latest content on idle.
-            scheduleParseAndRender(raw);
+            const raw = String(data.content ?? "");
+            // If we recently typed locally, buffer the remote edit briefly to avoid cursor jumps
+            if (Date.now() - lastLocalEditAt < 250) {
+              bufferedRemoteEdit = raw;
+              clearTimeout(applyBufferedTimeout);
+              applyBufferedTimeout = setTimeout(() => {
+                if (bufferedRemoteEdit != null) {
+                  scheduleParseAndRender(bufferedRemoteEdit);
+                  bufferedRemoteEdit = null;
+                }
+              }, 200);
+            } else {
+              const looksHtml = /^\s*<[^>]+>/.test(raw);
+              if (looksHtml) {
+                if (editor.innerHTML !== raw) editor.innerHTML = raw;
+              } else {
+                scheduleParseAndRender(raw);
+              }
+            }
+          }
+        }
+        // Handle incoming cursor events (collaborator carets)
+        if (data.type === 'cursor') {
+          // ignore our own cursor echoes
+          if (data.clientId && data.clientId === clientId) return;
+          const rect = data.rect;
+          if (!rect) {
+            removeCaret(data.clientId);
+          } else {
+            renderCaretFor(data.clientId, rect, data.username || 'User', data.avatarColor || '#2563eb');
           }
         }
       if (data.type === 'versions_list') {
@@ -618,6 +642,177 @@ editor.addEventListener("input", () => {
     }
   }, 200);
 });
+
+// --- Collaboration: carets + improved edit handling ---
+// Track recent local edit time to avoid applying remote edits immediately
+let lastLocalEditAt = 0;
+editor.addEventListener('input', () => {
+  lastLocalEditAt = Date.now();
+});
+
+// Buffer for remote edits that arrive while the user is typing
+let bufferedRemoteEdit = null;
+let applyBufferedTimeout = null;
+
+// Helper to get selection rect relative to editor (screen coords -> editor coords)
+function getSelectionRect() {
+  try {
+    const sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0).cloneRange();
+    let r = null;
+    if (range.collapsed) {
+      // collapsed caret; create a zero-width range to get rect
+      r = range.getClientRects()[0];
+      // Some browsers return null for collapsed caret rects. Try expanding by one character to get a rect.
+      if (!r) {
+        try {
+          const alt = range.cloneRange();
+          // try to expand forward by one character
+          if (alt.startContainer && alt.startContainer.nodeType === Node.TEXT_NODE) {
+            alt.setEnd(alt.startContainer, Math.min(alt.startOffset + 1, alt.startContainer.length));
+            r = alt.getClientRects()[0];
+          }
+        } catch (e) { r = null; }
+      }
+    } else {
+      r = range.getClientRects()[0];
+    }
+    if (!r) return null;
+    const editorRect = editor.getBoundingClientRect();
+    return {
+      left: r.left - editorRect.left + editor.scrollLeft,
+      top: r.top - editorRect.top + editor.scrollTop,
+      height: r.height || 16
+    };
+  } catch (e) { return null; }
+}
+
+// Send cursor/selection info (throttled)
+let _cursorThrottle = 0;
+function sendCursor(rect, collapsed) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({
+    type: 'cursor',
+    clientId,
+    username: (currentUser && currentUser.username) || null,
+    avatarColor: (currentUser && currentUser.avatarColor) || '#2563eb',
+    rect,
+    collapsed: !!collapsed,
+  }));
+}
+
+function maybeSendCursor(rect, collapsed) {
+  const now = Date.now();
+  // use 1000ms throttle for responsive updates
+  // Do not change this!
+  if (now - _cursorThrottle > 1000) {
+    _cursorThrottle = now;
+    sendCursor(rect, collapsed);
+  }
+}
+
+// Render collaborator carets
+const collaboratorCarets = {}; // clientId -> element
+function renderCaretFor(clientKey, { left, top, height } = {}, username = 'User', color = '#2563eb') {
+  if (!editor) return;
+  // container will be editor's parent (ensure positioned)
+  const container = editor.parentElement || document.body;
+  if (!container) return;
+  let el = collaboratorCarets[clientKey];
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'collab-caret';
+    el.style.position = 'absolute';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = 99999;
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'flex-start';
+    const label = document.createElement('div');
+    label.className = 'caret-label';
+    label.textContent = username;
+    label.style.fontSize = '11px';
+    label.style.background = color;
+    label.style.color = '#fff';
+    label.style.padding = '2px 6px';
+    label.style.borderRadius = '6px';
+    label.style.marginBottom = '-6px';
+    label.style.transform = 'translateY(-100%)';
+    const caret = document.createElement('div');
+    caret.className = 'caret-line';
+    caret.style.width = '4px';
+    caret.style.background = color;
+    caret.style.height = (height || 16) + 'px';
+    caret.style.boxShadow = `0 0 6px ${color}`;
+    caret.style.borderRadius = '2px';
+    el.appendChild(label);
+    el.appendChild(caret);
+    // ensure container positioned
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+    container.appendChild(el);
+    collaboratorCarets[clientKey] = el;
+  }
+  // Coordinates from clients are relative to the editor's content box; convert to container coordinates
+  const editorRect = editor.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  // compute the caret position relative to container
+  const containerLeft = left + editorRect.left - containerRect.left;
+  const containerTop = top + editorRect.top - containerRect.top;
+  el.style.left = containerLeft + 'px';
+  el.style.top = containerTop + 'px';
+}
+
+function removeCaret(clientKey) {
+  const el = collaboratorCarets[clientKey];
+  if (el && el.parentElement) el.parentElement.removeChild(el);
+  delete collaboratorCarets[clientKey];
+}
+
+// selectionchange -> send caret
+document.addEventListener('selectionchange', () => {
+  try {
+    const sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchorNode = sel.anchorNode;
+    if (!editor.contains(anchorNode)) return; // only when selection inside editor
+    const rect = getSelectionRect();
+    if (rect) maybeSendCursor(rect, sel.isCollapsed);
+  } catch (e) {}
+});
+
+// Immediate send on mouseup/focus so clicks are broadcast instantly
+if (editor) {
+  editor.addEventListener('mouseup', () => {
+    try {
+      const rect = getSelectionRect();
+      const sel = document.getSelection();
+      if (rect) sendCursor(rect, sel ? sel.isCollapsed : true);
+    } catch (e) {}
+  });
+  editor.addEventListener('focus', () => {
+    try {
+      const rect = getSelectionRect();
+      const sel = document.getSelection();
+      if (rect) sendCursor(rect, sel ? sel.isCollapsed : true);
+    } catch (e) {}
+  });
+}
+
+// Inject minimal CSS for carets
+try {
+  const styleId = 'collab-carets-style';
+  if (!document.getElementById(styleId)) {
+    const s = document.createElement('style');
+    s.id = styleId;
+    s.textContent = `
+      .collab-caret { transition: left 0.08s linear, top 0.08s linear; }
+      .collab-caret .caret-line { border-radius: 1px; }
+      .collab-caret .caret-label { white-space: nowrap; }
+    `;
+    document.head.appendChild(s);
+  }
+} catch (e) {}
 
 // Parsing scheduler: keeps only the latest content and parses it on idle to avoid blocking the WS message handler.
 let _scheduledContent = null;
