@@ -28,7 +28,6 @@ urlpatterns = [
     path('api/auth/me/', views.me_view, name='me'),
     path('api/auth/guest/', views.guest_login_view, name='guest_login'),
     path("health/", views.health_check, name="health_check"),
-    path("", include("main.urls")),
     
     # Project endpoints
     path('api/process-prompt/', views.process_prompt, name='process_prompt'),
