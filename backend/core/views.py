@@ -28,6 +28,10 @@ except Exception:
 
 # Create your views here.
 
+# Uptime robo ping view
+def health_check(request):
+    return JsonResponse({"status": "ok"}, status=200)
+
 # ===== USER AUTHENTICATION VIEWS =====
 
 @csrf_exempt
