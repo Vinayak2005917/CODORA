@@ -34,11 +34,10 @@ class EditorConsumer(AsyncWebsocketConsumer):
     
     # In-memory per-room users tracking (dict: room -> dict[channel_name -> user_info])
     room_users = {}
+    # In-memory per-room chat history cache
+    room_chat = {}
     # In-memory per-room chat history cache (dict: room -> list[message objects])
     room_chat = {}
-
-    # In-memory per-room blocks (dict: room -> dict[block_id -> {'position': str, 'content': str}])
-    room_blocks = {}
 
     async def connect(self):
         # Extract room from URL path (defaults to "default" for backward compatibility)
@@ -171,19 +170,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({ 'type': 'chat_history', 'messages': history }))
         except Exception as e:
             print('chat history send error', e)
-
-        # Send current blocks to the just-connected client
-        try:
-            blocks = self.room_blocks.get(self.room, {})
-            for bid, b in blocks.items():
-                await self.send(text_data=json.dumps({
-                    "type": "block_added",
-                    "block_id": bid,
-                    "position": b['position'],
-                    "content": b['content']
-                }))
-        except Exception as e:
-            print('blocks send error', e)
 
         # Broadcast user joined to all other clients in room
         await self.channel_layer.group_send(
@@ -460,73 +446,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
             print(f"[CHAT BROADCAST] room={self.room} from={self.channel_name} id={msg_obj['id']}")
             return
 
-        if msg_type == 'add_block':
-            block_id = data.get('block_id')
-            position = data.get('position', 'end')
-            if self.room not in self.room_blocks:
-                self.room_blocks[self.room] = {}
-            self.room_blocks[self.room][block_id] = {'position': position, 'content': ''}
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    "type": "block_added",
-                    "block_id": block_id,
-                    "position": position,
-                    "content": "",
-                    "client_id": self.channel_name
-                }
-            )
-            return
-
-        if msg_type == 'edit_block':
-            block_id = data.get('block_id')
-            content = data.get('content', '')
-            if self.room in self.room_blocks and block_id in self.room_blocks[self.room]:
-                self.room_blocks[self.room][block_id]['content'] = content
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "block_edited",
-                        "block_id": block_id,
-                        "content": content,
-                        "client_id": self.channel_name
-                    }
-                )
-            return
-
-        if msg_type == 'integrate_block':
-            block_id = data.get('block_id')
-            if self.room in self.room_blocks and block_id in self.room_blocks[self.room]:
-                block_content = self.room_blocks[self.room][block_id]['content']
-                # Append to main content
-                current_content = self.room_content_cache.get(self.room, '')
-                new_content = current_content + '\n\n' + block_content
-                self.room_content_cache[self.room] = new_content
-                # Save to file
-                from .project_store import project_store
-                await sync_to_async(project_store.save_content)(self.room, new_content)
-                # Remove block
-                del self.room_blocks[self.room][block_id]
-                # Broadcast updated content
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "editor.message",
-                        "content": new_content,
-                        "client_id": self.channel_name
-                    }
-                )
-                # Broadcast block removed
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "block_integrated",
-                        "block_id": block_id,
-                        "client_id": self.channel_name
-                    }
-                )
-            return
-
         # Ignore unknown message types
         return
 
@@ -588,25 +507,4 @@ class EditorConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'versions_list',
             'versions': event.get('versions', [])
-        }))
-
-    async def block_added(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'block_added',
-            'block_id': event.get('block_id'),
-            'position': event.get('position'),
-            'content': event.get('content')
-        }))
-
-    async def block_edited(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'block_edited',
-            'block_id': event.get('block_id'),
-            'content': event.get('content')
-        }))
-
-    async def block_integrated(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'block_integrated',
-            'block_id': event.get('block_id')
         }))
