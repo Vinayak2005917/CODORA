@@ -200,11 +200,87 @@ function ensureFloatingPrompt() {
 
 window.addEventListener('DOMContentLoaded', () => {
   ensureFloatingPrompt();
+  // initialize highlight and line numbers
+  try { updateHighlight(); } catch (e) { }
 });
 const editor = document.getElementById('editor');
 const saveBtn = document.getElementById('saveBtn');
 const saveStatus = document.getElementById('saveStatus');
 const connStatus = document.getElementById('connStatus');
+
+// Highlighting and helpers
+const highlighted = document.querySelector('#highlightedCode code');
+const codeBlock = document.getElementById('highlightedCode');
+const lineNumbersEl = document.getElementById('lineNumbers');
+
+function updateLineNumbers() {
+  if (!lineNumbersEl || !editor) return;
+  const lines = (editor.value || '').split('\n').length || 1;
+  let numbers = '';
+  for (let i = 1; i <= lines; i++) numbers += i + '\n';
+  lineNumbersEl.textContent = numbers;
+  // sync scroll
+  try { lineNumbersEl.scrollTop = editor.scrollTop; } catch (e) {}
+}
+
+function updateHighlight() {
+  if (!editor || !highlighted || !codeBlock) return;
+  // Escape HTML entities
+  const escaped = (editor.value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  highlighted.innerHTML = escaped;
+  try { Prism.highlightElement(highlighted); } catch (e) { /* Prism may not be loaded yet */ }
+
+  // Sync scroll
+  codeBlock.scrollTop = editor.scrollTop;
+  codeBlock.scrollLeft = editor.scrollLeft;
+  // also sync line numbers
+  updateLineNumbers();
+}
+
+function setEditorContent(val) {
+  if (!editor) return;
+  editor.value = val;
+  updateHighlight();
+}
+
+// Sync scrolling
+if (editor) {
+  editor.addEventListener('scroll', () => {
+    if (codeBlock) {
+      codeBlock.scrollTop = editor.scrollTop;
+      codeBlock.scrollLeft = editor.scrollLeft;
+    }
+    if (lineNumbersEl) lineNumbersEl.scrollTop = editor.scrollTop;
+  });
+
+  // also update highlight on input (we keep existing debounce for edits later)
+  editor.addEventListener('input', () => {
+    updateHighlight();
+  });
+}
+
+// Language selector hookup
+const languageSelect = document.querySelector('.language-select');
+if (languageSelect) {
+  languageSelect.addEventListener('change', () => {
+    const lang = languageSelect.value.toLowerCase();
+    const pre = document.getElementById('highlightedCode');
+    if (pre) pre.className = `language-${lang}`;
+    // Try to load Prism language component for JS dynamically if needed
+    if (lang === 'javascript' && typeof Prism !== 'undefined' && !Prism.languages.javascript) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js';
+      script.onload = () => updateHighlight();
+      document.head.appendChild(script);
+    } else {
+      updateHighlight();
+    }
+  });
+}
 
 // Parse room number from URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -267,7 +343,7 @@ function connectWS() {
           console.warn('Failed to unwrap code blocks for edit message', e);
         }
         if (editor.value !== content) {
-          editor.value = content;
+          setEditorContent(content);
         }
       }
       if (data.type === "saved") {
@@ -380,7 +456,7 @@ function connectWS() {
           }
           // Load the extracted content into the editor
           if (editor) {
-            editor.value = content;
+            setEditorContent(content);
           }
         } else if (data.error) {
           alert('Version not found');
