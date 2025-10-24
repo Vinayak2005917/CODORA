@@ -574,7 +574,7 @@ console.log('connectWS: Initial connection attempt made');
 
 // Debounced send of edits
 let editTimeout;
-if (editor) {
+if (editor && !editor.readOnly) {
   editor.addEventListener("input", () => {
     clearTimeout(editTimeout);
     editTimeout = setTimeout(() => {
@@ -585,6 +585,9 @@ if (editor) {
       }
     }, 300);
   });
+} else {
+  // Editor is read-only; do not attach live edit sender
+  console.log('Editor is read-only; live edits are disabled');
 }
 
 // Save button
@@ -615,6 +618,142 @@ function loadVersion(versionId) {
     renderVersionHistory();
 }
 
+// --- Editable Block Context Menu ---
+let blockMenu = null;
+function showBlockMenu(x, y, line) {
+  hideBlockMenu();
+  blockMenu = document.createElement('div');
+  blockMenu.className = 'block-menu';
+  blockMenu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:10001;background:#fff;border:1px solid #3b82f6;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:10px 18px;`;
+  blockMenu.innerHTML = `<button id="createBlockBtn" style="background:#3b82f6;color:white;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;">Create Editable Block Here (Line ${line})</button>`;
+  document.body.appendChild(blockMenu);
+  document.getElementById('createBlockBtn').onclick = function() {
+    hideBlockMenu();
+    // Next step: insert editable block after this line
+    window.insertEditableBlockAfterLine(line);
+  };
+}
+
+function hideBlockMenu() {
+  if (blockMenu) {
+    blockMenu.remove();
+    blockMenu = null;
+  }
+}
+
+// Attach right-click handler to code area
+window.addEventListener('DOMContentLoaded', () => {
+  const codeArea = document.querySelector('.code-area');
+  if (codeArea) {
+    codeArea.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      // Find line number from click position
+      const editorEl = document.getElementById('editor');
+      if (!editorEl) return;
+      const rect = editorEl.getBoundingClientRect();
+      const relY = e.clientY - rect.top;
+      const lineHeight = 24; // matches CSS line-height
+      let line = Math.floor(relY / lineHeight) + 1;
+      // Clamp to valid line range
+      const totalLines = (editorEl.value || '').split('\n').length;
+      if (line < 1) line = 1;
+      if (line > totalLines) line = totalLines;
+      showBlockMenu(e.clientX, e.clientY, line);
+    });
+  }
+  // Hide menu on click elsewhere
+  document.addEventListener('click', function(e) {
+    if (blockMenu && !blockMenu.contains(e.target)) hideBlockMenu();
+  });
+});
+
+// Placeholder for block insertion logic
+window.insertEditableBlockAfterLine = function(line) {
+  alert('Insert editable block after line ' + line + ' (next step)');
+};
+
+// --- Hovered line highlighting ---
+let hoverLineEl = null;
+let _lastMouseClientY = null;
+let _lastMouseClientX = null;
+function ensureHoverLine() {
+  if (hoverLineEl) return hoverLineEl;
+  const codeArea = document.querySelector('.code-area');
+  if (!codeArea) return null;
+  hoverLineEl = document.createElement('div');
+  hoverLineEl.className = 'hover-line hidden';
+  // Append as child of code-area so positioning is relative to it
+  codeArea.appendChild(hoverLineEl);
+  return hoverLineEl;
+}
+
+function updateHoverFromEvent(evt) {
+  const editorEl = document.getElementById('editor');
+  const codeBlockEl = document.getElementById('highlightedCode');
+  if (!editorEl) return;
+  const el = ensureHoverLine();
+  if (!el) return;
+  const rect = editorEl.getBoundingClientRect();
+  // Save last mouse position for scroll-time updates
+  if (evt && typeof evt.clientY === 'number') _lastMouseClientY = evt.clientY;
+  if (evt && typeof evt.clientX === 'number') _lastMouseClientX = evt.clientX;
+  if (_lastMouseClientY === null) return;
+  let relY = _lastMouseClientY - rect.top;
+  // account for padding top (16px)
+  const paddingTop = 16;
+  const lineHeight = 24;
+  // If mouse is outside the editor vertical bounds, hide
+  if (relY < paddingTop || relY > rect.height - 8) {
+    el.classList.add('hidden');
+    return;
+  }
+  // snap the top to the line grid relative to the editor's visible area
+  const row = Math.floor((relY - paddingTop) / lineHeight);
+  const totalLines = (editorEl.value || '').split('\n').length;
+  let lineIndex = row + 1;
+  if (lineIndex < 1) lineIndex = 1;
+  if (lineIndex > totalLines) {
+    el.classList.add('hidden');
+    return;
+  }
+  const top = paddingTop + row * lineHeight;
+  el.style.top = top + 'px';
+  el.style.height = lineHeight + 'px';
+  el.classList.remove('hidden');
+}
+
+function hideHoverLine() {
+  if (!hoverLineEl) return;
+  hoverLineEl.classList.add('hidden');
+}
+
+function initHoverListeners() {
+  const editorEl = document.getElementById('editor');
+  const codeBlockEl = document.getElementById('highlightedCode');
+  if (!editorEl) return;
+  ensureHoverLine();
+  // mouse move inside editor
+  editorEl.addEventListener('mousemove', (e) => updateHoverFromEvent(e));
+  editorEl.addEventListener('mouseleave', (e) => { _lastMouseClientY = null; hideHoverLine(); });
+  // also listen on highlighted code (so hovering over highlighted areas works)
+  if (codeBlockEl) {
+    codeBlockEl.addEventListener('mousemove', (e) => updateHoverFromEvent(e));
+    codeBlockEl.addEventListener('mouseleave', (e) => { _lastMouseClientY = null; hideHoverLine(); });
+  }
+  // update overlay position when scrolling
+  editorEl.addEventListener('scroll', () => {
+    // If we have a last mouse position, recompute the hover position so it stays aligned
+    if (_lastMouseClientY !== null) {
+      updateHoverFromEvent({ clientY: _lastMouseClientY });
+    }
+  });
+}
+
+// initialize hover listeners after DOM load
+window.addEventListener('DOMContentLoaded', () => {
+  initHoverListeners();
+});
+
 function showRunOutput(outputText) {
   let panel = document.getElementById('runOutputPanel');
   if (!panel) {
@@ -643,11 +782,11 @@ function runCodeSimulation() {
     (async () => {
       try {
         showRunOutput('Running...');
-        // Wrap user code to capture stdout and exceptions into a single string _out
-        const lines = (code || '').split('\n');
-        // indent user code for the with-block
-        const indented = lines.map(l => '    ' + l).join('\n');
-        const wrapper = `import sys, io, contextlib, traceback\n_buf = io.StringIO()\ntry:\n    with contextlib.redirect_stdout(_buf):\n${indented}\nexcept Exception:\n    _buf.write(traceback.format_exc())\n_out = _buf.getvalue()`;
+        // Safely embed user code as a JS-escaped string and exec() it in Python.
+        // Provide a simple browser-backed input() using js.prompt so scripts
+        // that call input() work in the browser.
+        const code_js = JSON.stringify(code || "");
+        const wrapper = `import sys, io, contextlib, traceback, builtins, js\n_code = ${code_js}\n_buf = io.StringIO()\n# Provide input() via browser prompt\ndef _input(prompt=''):\n    res = js.prompt(prompt)\n    if res is None:\n        raise EOFError('input cancelled')\n    return res\nbuiltins.input = _input\ntry:\n    with contextlib.redirect_stdout(_buf):\n        exec(_code, {})\nexcept Exception:\n    _buf.write(traceback.format_exc())\n_out = _buf.getvalue()`;
 
         const result = await window.pyodide.runPythonAsync(wrapper + '\n_out');
         const text = (result === undefined || result === null) ? '' : String(result);

@@ -511,6 +511,12 @@ body {
   box-sizing: border-box;
 }
 
+/* Readonly textarea: hide caret and use default cursor */
+#editor[readonly] {
+  caret-color: transparent !important;
+  cursor: default;
+}
+
 /* Keep the visible line-numbers column independent but sync scroll with textarea */
 .line-numbers { overflow: hidden; }
 
@@ -769,3 +775,47 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #fa8282;
 }
+
+/* Editable block context menu */
+.block-menu {
+  position: fixed;
+  z-index: 10001;
+  background: #fff;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 10px 18px;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.block-menu button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+}
+.block-menu button:hover {
+  background: #2563eb;
+}
+
+/* Hovered line highlight */
+.hover-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 24px; /* should match line-height */
+  background: rgba(59,130,246,0.08); /* subtle blue */
+  pointer-events: none; /* let mouse events pass through */
+  border-left: 3px solid rgba(59,130,246,0.18);
+  z-index: 2;
+  transition: background 0.12s ease;
+}
+
+/* Hidden by default */
+.hover-line.hidden { display: none; }
