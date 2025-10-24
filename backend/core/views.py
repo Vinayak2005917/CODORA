@@ -340,7 +340,12 @@ def create_project(request):
             api_key=api_key,
         )
         
-        # Generate AI content with Markdown formatting
+        # Generate AI content
+        if project_type == 'code':
+            system_content = "You are a helpful AI assistant named CODORA AI, used to generate code. Provide clean, well-commented code without any Markdown formatting or code blocks. Include comments for clarity."
+        else:
+            system_content = "You are a helpful AI assistant named CODORA AI, used to create documents. Format your responses using Markdown for better readability. Use headers, bold, italics, lists, and other Markdown features as appropriate."
+        
         try:
             completion = client.chat.completions.create(
                 extra_headers={
@@ -352,7 +357,7 @@ def create_project(request):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant named CODORA AI, which is used to make documents and code files.When asked for Document or any sort of text response you Format your responses using Markdown for better readability. Use headers (# ## ###), bold (**text**), italics (*text*), code blocks (```), lists, and other Markdown features as appropriate. But when asked for Code you directly give code with any other useless text, do include comments. never user ``` NEVER!"
+                        "content": system_content
                     },
                     {
                         "role": "user",
@@ -448,10 +453,10 @@ def ai_prompt_commit(request, room):
         code_only = extract_code_blocks(current_content)
 
         # Compose system + content + user prompt
-        system_msg = (
-            "You are a helpful AI assistant named CODORA AI, used to edit and improve documents and code. "
-            "When asked for Document or text responses use Markdown formatting. When asked for code, return code blocks only. never user ``` NEVER!"
-        )
+        if proj['type'] == 'code':
+            system_msg = "You are a helpful AI assistant named CODORA AI, used to edit and improve code. Provide clean, well-commented code without any Markdown formatting or code blocks."
+        else:
+            system_msg = "You are a helpful AI assistant named CODORA AI, used to edit and improve documents. Format your responses using Markdown for better readability. Use headers, bold, italics, lists, and other Markdown features as appropriate."
 
         user_message = f"Current file content:\n```\n{code_only}\n```\n\nUser request:\n{prompt}"
 

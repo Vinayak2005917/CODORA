@@ -144,6 +144,8 @@ const saveBtn = document.getElementById("saveBtn");
 const saveStatus = document.getElementById("saveStatus");
 const connStatus = document.getElementById("connStatus");
 
+let blocks = {}; // blockId -> {element, content}
+
 // Parse room number from URL parameter
 const urlParams = new URLSearchParams(window.location.search);
 const room = urlParams.get('room') || 'default';
@@ -427,6 +429,23 @@ function connect() {
       console.log('Connected as', currentUser);
     }
 
+    if (data.type === 'block_added') {
+      addEditableBlock(data.block_id, data.content);
+    }
+
+    if (data.type === 'block_edited') {
+      if (blocks[data.block_id]) {
+        blocks[data.block_id].element.querySelector('textarea').value = data.content;
+      }
+    }
+
+    if (data.type === 'block_integrated') {
+      if (blocks[data.block_id]) {
+        blocks[data.block_id].element.remove();
+        delete blocks[data.block_id];
+      }
+    }
+
     if (data.type === 'version_deleted') {
       if (data.ok) {
         showNotification('Version deleted', 'info');
@@ -479,6 +498,54 @@ function showNotification(message, type = "info") {
 }
 
 connect();
+
+// Context menu for adding blocks
+editor.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const menu = document.getElementById('contextMenu');
+  menu.style.left = e.pageX + 'px';
+  menu.style.top = e.pageY + 'px';
+  menu.style.display = 'block';
+  // Hide on click outside
+  document.addEventListener('click', () => menu.style.display = 'none', {once: true});
+});
+
+document.getElementById('addBlockBtn').addEventListener('click', () => {
+  const menu = document.getElementById('contextMenu');
+  menu.style.display = 'none';
+  const blockId = 'block_' + Date.now();
+  addEditableBlock(blockId, '');
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type: 'add_block', block_id: blockId, position: 'end'}));
+  }
+});
+
+function addEditableBlock(blockId, content) {
+  const blockDiv = document.createElement('div');
+  blockDiv.className = 'editable-block';
+  blockDiv.id = 'block_' + blockId;
+  const textarea = document.createElement('textarea');
+  textarea.value = content;
+  textarea.addEventListener('input', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({type: 'edit_block', block_id: blockId, content: textarea.value}));
+    }
+  });
+  const integrateBtn = document.createElement('button');
+  integrateBtn.className = 'integrate-btn';
+  integrateBtn.textContent = 'Integrate';
+  integrateBtn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({type: 'integrate_block', block_id: blockId}));
+    }
+    blockDiv.remove();
+    delete blocks[blockId];
+  });
+  blockDiv.appendChild(textarea);
+  blockDiv.appendChild(integrateBtn);
+  editor.appendChild(blockDiv);
+  blocks[blockId] = {element: blockDiv, content: content};
+}
 
 // ---------------- Floating prompt (bottom) ----------------
 // If there's already a floating prompt, don't recreate it
@@ -630,25 +697,7 @@ window.addEventListener('DOMContentLoaded', () => {
   ensureFloatingPrompt();
 });
 
-// Debounced send of edits
-let editTimeout;
-editor.addEventListener("input", () => {
-  clearTimeout(editTimeout);
-  editTimeout = setTimeout(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({ type: "edit", content: editor.innerHTML, clientId })
-      );
-    }
-  }, 200);
-});
-
 // --- Collaboration: carets + improved edit handling ---
-// Track recent local edit time to avoid applying remote edits immediately
-let lastLocalEditAt = 0;
-editor.addEventListener('input', () => {
-  lastLocalEditAt = Date.now();
-});
 
 // Buffer for remote edits that arrive while the user is typing
 let bufferedRemoteEdit = null;
@@ -861,6 +910,13 @@ function _doParseAndRender(raw) {
 
   // Update DOM
   if (editor.innerHTML !== content) editor.innerHTML = content;
+
+  // Re-append blocks
+  for (let bid in blocks) {
+    if (!document.getElementById('block_' + bid)) {
+      editor.appendChild(blocks[bid].element);
+    }
+  }
 
   // Highlight on next tick to avoid blocking
   setTimeout(() => {
