@@ -203,6 +203,42 @@ window.addEventListener('DOMContentLoaded', () => {
   // initialize highlight and line numbers
   try { updateHighlight(); } catch (e) { }
 });
+// --- Pyodide setup ---
+// Load pyodide in the background; will enable running Python in the browser.
+window.pyodide = null;
+window.pyodideReady = false;
+
+async function loadPyodideRuntime() {
+  try {
+    // load the script dynamically to avoid blocking page load
+    if (!window.loadPyodide) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+      s.onload = () => console.log('pyodide script loaded');
+      document.head.appendChild(s);
+      // wait until loadPyodide is available
+      let attempts = 0;
+      while (typeof window.loadPyodide !== 'function' && attempts < 50) {
+        // small delay
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(r => setTimeout(r, 100));
+        attempts++;
+      }
+    }
+    if (typeof window.loadPyodide === 'function') {
+      window.pyodide = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/' });
+      window.pyodideReady = true;
+      console.log('Pyodide ready');
+    } else {
+      console.warn('Pyodide failed to load');
+    }
+  } catch (e) {
+    console.error('Failed to initialize pyodide', e);
+  }
+}
+
+// Start loading in background
+loadPyodideRuntime();
 const editor = document.getElementById('editor');
 const saveBtn = document.getElementById('saveBtn');
 const saveStatus = document.getElementById('saveStatus');
@@ -602,7 +638,32 @@ function showRunOutput(outputText) {
 
 function runCodeSimulation() {
   const code = editor ? editor.value : '';
-  // Very small simulation: echo back first 1000 chars and pretend it's output
+  // If Pyodide is available, run using it; otherwise fall back to simulation
+  if (window.pyodideReady && window.pyodide) {
+    (async () => {
+      try {
+        showRunOutput('Running...');
+        // Wrap user code to capture stdout and exceptions into a single string _out
+        const lines = (code || '').split('\n');
+        // indent user code for the with-block
+        const indented = lines.map(l => '    ' + l).join('\n');
+        const wrapper = `import sys, io, contextlib, traceback\n_buf = io.StringIO()\ntry:\n    with contextlib.redirect_stdout(_buf):\n${indented}\nexcept Exception:\n    _buf.write(traceback.format_exc())\n_out = _buf.getvalue()`;
+
+        const result = await window.pyodide.runPythonAsync(wrapper + '\n_out');
+        const text = (result === undefined || result === null) ? '' : String(result);
+        showRunOutput(text);
+      } catch (err) {
+        try {
+          showRunOutput(String(err));
+        } catch (e) {
+          showRunOutput('Error running Python: ' + String(err));
+        }
+      }
+    })();
+    return;
+  }
+
+  // Fallback: simple simulation when pyodide isn't ready
   const snippet = code ? code.substring(0, 1000) : '<no code to run>';
   const now = new Date().toLocaleTimeString();
   const output = `=== Run at ${now} ===\n\n${snippet}\n\n=== End ===`;

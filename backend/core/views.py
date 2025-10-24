@@ -454,7 +454,7 @@ def ai_prompt_commit(request, room):
 
         # Compose system + content + user prompt
         if proj['type'] == 'code':
-            system_msg = "You are a helpful AI assistant named CODORA AI, used to edit and improve code. Provide clean, well-commented code without any Markdown formatting or code blocks."
+            system_msg = "You are a helpful AI assistant named CODORA AI, used to edit and improve code. Provide clean CODE and nothing else, just code. no extra text"
         else:
             system_msg = "You are a helpful AI assistant named CODORA AI, used to edit and improve documents. Format your responses using Markdown for better readability. Use headers, bold, italics, lists, and other Markdown features as appropriate."
 
