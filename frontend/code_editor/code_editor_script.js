@@ -251,9 +251,30 @@ const lineNumbersEl = document.getElementById('lineNumbers');
 
 function updateLineNumbers() {
   if (!lineNumbersEl || !editor) return;
-  const lines = (editor.value || '').split('\n').length || 1;
+  const linesArr = (editor.value || '').split('\n');
+  const total = linesArr.length || 1;
+  // Build placeholder mask for editor line indices which are reserved for blocks
+  const placeholderMask = new Array(total).fill(false);
+  Object.values(blocks).forEach(b => {
+    const start = Number(b.line) || 0; // placeholders start at editor index == block.line
+    const count = Number(b.placeholder_lines) || 0;
+    for (let k = 0; k < count; k++) {
+      const idx = start + k;
+      if (idx >= 0 && idx < total) placeholderMask[idx] = true;
+    }
+  });
+
   let numbers = '';
-  for (let i = 1; i <= lines; i++) numbers += i + '\n';
+  let visible = 0;
+  for (let i = 0; i < total; i++) {
+    if (placeholderMask[i]) {
+      numbers += '\n'; // leave gutter blank for placeholder lines
+    } else {
+      visible++;
+      numbers += visible + '\n';
+    }
+  }
+
   lineNumbersEl.textContent = numbers;
   // sync scroll
   try { lineNumbersEl.scrollTop = editor.scrollTop; } catch (e) {}
@@ -354,6 +375,10 @@ function connectWS() {
     // Try to load versions now that we're connected
     console.log('WebSocket: Connection opened, calling renderVersionHistory');
     renderVersionHistory();
+    // Request existing blocks so this client can render them
+    try {
+      ws.send(JSON.stringify({ type: 'list_blocks' }));
+    } catch (e) { console.warn('Failed to request blocks list', e); }
   };
 
   ws.onclose = () => {
@@ -525,6 +550,73 @@ function connectWS() {
         } else {
           showNotification('Failed to delete version', 'error');
         }
+      }
+      // Collaborative blocks
+      if (data.type === 'blocks_list') {
+        try {
+          const list = Array.isArray(data.blocks) ? data.blocks.slice() : [];
+          // sort ascending by line so we insert from top to bottom and avoid shifting mistakes
+          list.sort((a,b) => (Number(a.line)||0) - (Number(b.line)||0));
+          list.forEach(item => {
+            if (!item.id) return;
+            if (blocks[item.id]) return; // skip existing
+            const placeholder = Number(item.placeholder_lines) || 3;
+            insertBlankLinesAfter(Number(item.line), placeholder);
+            // shift existing blocks after insertion
+            Object.values(blocks).forEach(b => { if (b.line > item.line) b.line += placeholder; });
+            const blk = { id: item.id, line: Number(item.line) || 1, content: item.content || '', placeholder_lines: placeholder };
+            blocks[item.id] = blk;
+            renderBlock(blk);
+          });
+          updateAllBlockPositions();
+        } catch (e) { console.warn('Failed to handle blocks_list', e); }
+      }
+
+      // Collaborative blocks
+      if (data.type === 'create_block') {
+        try {
+          if (!data.id) return;
+          // if this message came from this client, ignore (we already created locally)
+          if (data.clientId && data.clientId === clientId) return;
+          if (blocks[data.id]) return; // already have it
+          const placeholder = Number(data.placeholder_lines) || 3;
+          // insert blank lines at the specified position so the block pushes content down
+          insertBlankLinesAfter(Number(data.line), placeholder);
+          // shift existing blocks after insertion
+          Object.values(blocks).forEach(b => { if (b.line > data.line) b.line += placeholder; });
+          const blk = { id: data.id, line: Number(data.line) || 1, content: data.content || '', placeholder_lines: placeholder };
+          blocks[data.id] = blk;
+          renderBlock(blk);
+          updateAllBlockPositions();
+        } catch (e) { console.warn('Failed to handle create_block', e); }
+      }
+
+      if (data.type === 'update_block') {
+        try {
+          if (!data.id) return;
+          // If this update originated from this client, ignore (we already have the content)
+          if (data.clientId && data.clientId === clientId) return;
+          if (blocks[data.id]) {
+            blocks[data.id].content = data.content || '';
+            const ta = blocks[data.id].el && blocks[data.id].el.querySelector('.block-text');
+            if (ta && ta.value !== (data.content || '')) {
+              // apply without moving cursor overly much
+              const selStart = ta.selectionStart;
+              const selEnd = ta.selectionEnd;
+              ta.value = data.content || '';
+              try { ta.setSelectionRange(selStart, selEnd); } catch (e) {}
+            }
+          } else {
+            // create a placeholder block if we didn't have it
+            const placeholder = Number(data.placeholder_lines) || 3;
+            insertBlankLinesAfter(Number(data.line), placeholder);
+            Object.values(blocks).forEach(b => { if (b.line > data.line) b.line += placeholder; });
+            const blk = { id: data.id, line: Number(data.line) || 1, content: data.content || '', placeholder_lines: placeholder };
+            blocks[data.id] = blk;
+            renderBlock(blk);
+            updateAllBlockPositions();
+          }
+        } catch (e) { console.warn('Failed to handle update_block', e); }
       }
     } catch (e) {
       console.warn("WS message parse error", e);
@@ -824,3 +916,151 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// --- Editable blocks (collaborative) ---
+const blocks = {}; // id -> {id,line,content,el}
+
+function parsePx(v) { return parseFloat(v.replace('px',''))||0; }
+
+function getEditorLayout() {
+  const editorEl = document.getElementById('editor');
+  if (!editorEl) return {paddingTop:16,lineHeight:24};
+  const cs = window.getComputedStyle(editorEl);
+  const paddingTop = parsePx(cs.paddingTop || '16px') || 16;
+  const lineHeight = parsePx(cs.lineHeight || '24px') || 24;
+  return { paddingTop, lineHeight };
+}
+
+function computeBlockTopForLine(line) {
+  const editorEl = document.getElementById('editor');
+  if (!editorEl) return 0;
+  const { paddingTop, lineHeight } = getEditorLayout();
+  const rowIndex = Math.max(0, line); // place after the given 1-based line -> rowIndex = line
+  const top = paddingTop + rowIndex * lineHeight - editorEl.scrollTop;
+  return top;
+}
+
+function renderBlock(block) {
+  const codeArea = document.querySelector('.code-area');
+  // If the DOM hasn't finished loading the code area yet (WS may deliver
+  // blocks before DOMContentLoaded), retry a few times so the block will be
+  // rendered once the editor is present. Avoid infinite retries by tracking
+  // attempts on the block object.
+  if (!codeArea) {
+    block._renderRetries = (block._renderRetries || 0) + 1;
+    if (block._renderRetries <= 10) {
+      // try again shortly
+      setTimeout(() => renderBlock(block), 120);
+    } else {
+      console.warn('renderBlock: .code-area not found after retries, giving up for block', block.id);
+    }
+    return;
+  }
+  // If element exists, update
+  let wrapper = document.querySelector(`.editable-block[data-block-id="${block.id}"]`);
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'editable-block';
+    wrapper.setAttribute('data-block-id', block.id);
+    wrapper.innerHTML = `
+      <textarea class="block-text" placeholder="Add Code"></textarea>
+    `;
+    codeArea.appendChild(wrapper);
+
+    // Input listener (debounced) to send updates
+    const ta = wrapper.querySelector('.block-text');
+    let tmo;
+    ta.addEventListener('input', (e) => {
+      block.content = ta.value;
+      clearTimeout(tmo);
+      tmo = setTimeout(() => {
+        // send update via WS
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'update_block', id: block.id, content: block.content, clientId }));
+        }
+      }, 400);
+    });
+  }
+
+  // update content
+  const ta = wrapper.querySelector('.block-text');
+  if (ta && ta.value !== (block.content || '')) ta.value = block.content || '';
+
+  // position
+  const top = computeBlockTopForLine(block.line);
+  wrapper.style.top = top + 'px';
+  // update meta label
+  const metaLabel = wrapper.querySelector('.block-meta > div');
+  if (metaLabel) metaLabel.textContent = `Block after line ${block.line}`;
+  // store element reference
+  block.el = wrapper;
+}
+
+function createBlockLocal(line, content='') {
+  const id = `${clientId}-${Date.now()}`;
+  const blockLines = 3; // reserve 3 blank lines by default so block pushes content down
+  insertBlankLinesAfter(line, blockLines);
+  // shift existing blocks after insertion
+  Object.values(blocks).forEach(b => { if (b.line > line) b.line += blockLines; });
+  const block = { id, line: Number(line)||1, content: content || '', placeholder_lines: blockLines };
+  blocks[id] = block;
+  renderBlock(block);
+  // Recalculate positions so blocks and line numbers stay aligned
+  updateAllBlockPositions();
+  // send creation to others
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'create_block', id: block.id, line: block.line, content: block.content, placeholder_lines: block.placeholder_lines, clientId }));
+  }
+}
+
+// expose insertion used by context menu
+window.insertEditableBlockAfterLine = function(defaultLine) {
+  const editorEl = document.getElementById('editor');
+  let lineInput = prompt('Insert block after which line number?', String(defaultLine || 1));
+  if (lineInput === null) return; // cancelled
+  let lineNum = parseInt(lineInput, 10);
+  if (isNaN(lineNum) || lineNum < 0) lineNum = 1;
+  const total = (editorEl.value || '').split('\n').length;
+  if (lineNum > total) lineNum = total;
+  createBlockLocal(lineNum, '');
+};
+
+function insertBlankLinesAfter(line, count) {
+  const editorEl = document.getElementById('editor');
+  if (!editorEl) return;
+  const lines = (editorEl.value || '').split('\n');
+  const idx = Math.max(0, Math.min(lines.length, Number(line)));
+  const blanks = new Array(count).fill('');
+  lines.splice(idx, 0, ...blanks);
+  const newVal = lines.join('\n');
+  // set without triggering remote sends twice (we still have edit sender which will send edit messages)
+  editorEl.value = newVal;
+  updateHighlight();
+  // ensure line numbers and block positions reflect the inserted blanks
+  updateAllBlockPositions();
+}
+
+// Update positions of all blocks on scroll/resize
+function updateAllBlockPositions() {
+  Object.values(blocks).forEach(b => {
+    if (b && b.el) {
+      const top = computeBlockTopForLine(b.line);
+      b.el.style.top = top + 'px';
+      // also update the displayed meta label in case b.line changed
+      const metaLabel = b.el.querySelector('.block-meta > div');
+      if (metaLabel) metaLabel.textContent = `Block after line ${b.line}`;
+    }
+  });
+}
+
+// wire into editor scroll
+if (editor) {
+  editor.addEventListener('scroll', () => {
+    updateAllBlockPositions();
+  });
+}
+
+// handle incoming block messages
+// extend WS onmessage handling to create/update blocks
+const originalOnMessage = ws && ws.onmessage;
+// Note: ws.onmessage is already defined above; we augment handling inside that function instead of overwriting.
