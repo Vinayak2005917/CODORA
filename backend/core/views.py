@@ -200,6 +200,47 @@ def login_view(request):
                 else:
                     return JsonResponse({'error': f'Supabase login/signup failed: {msg}'}, status=500)
 
+        # Try to extract a Supabase session token if available
+        supabase_token = None
+        supabase_backed = False
+        try:
+            # If sign-in succeeded earlier, resp should be present and not indicate an error
+            if not sign_in_failed and 'resp' in locals() and resp:
+                # Try multiple shapes
+                if isinstance(resp, dict):
+                    data = resp.get('data') or resp.get('session') or resp.get('user')
+                    # common shape: {'data': {'session': {'access_token': '...'}}}
+                    if isinstance(data, dict):
+                        session = data.get('session') or data
+                        if isinstance(session, dict):
+                            supabase_token = session.get('access_token') or session.get('accessToken')
+                else:
+                    # object-like
+                    session = getattr(resp, 'session', None) or getattr(resp, 'data', None)
+                    if session and hasattr(session, 'get'):
+                        supabase_token = session.get('access_token') or session.get('accessToken')
+                if supabase_token:
+                    supabase_backed = True
+
+            # If sign-up created the account, attempt to get token from signup_resp
+            if not supabase_token and 'signup_resp' in locals() and signup_resp:
+                sresp = signup_resp
+                if isinstance(sresp, dict):
+                    data = sresp.get('data') or sresp.get('session') or sresp.get('user')
+                    if isinstance(data, dict):
+                        session = data.get('session') or data
+                        if isinstance(session, dict):
+                            supabase_token = session.get('access_token') or session.get('accessToken')
+                else:
+                    session = getattr(sresp, 'session', None) or getattr(sresp, 'data', None)
+                    if session and hasattr(session, 'get'):
+                        supabase_token = session.get('access_token') or session.get('accessToken')
+                if supabase_token:
+                    supabase_backed = True
+        except Exception:
+            supabase_token = None
+            supabase_backed = False
+
         # At this point Supabase accepted the credentials. Ensure a local Django user exists and log them in.
         try:
             user, created = User.objects.get_or_create(username=username, defaults={'email': email})
@@ -211,17 +252,34 @@ def login_view(request):
                 user.save()
 
             login(request, user)
+            # Ensure session is persisted so we can observe the session cookie
+            try:
+                request.session.save()
+            except Exception:
+                pass
 
-            return JsonResponse({
+            resp_data = {
                 'ok': True,
                 'created': created,
+                'supabase_backed': supabase_backed,
+                'supabase_token': supabase_token,
                 'user': {
                     'id': user.id,
                     'username': user.username,
                     'email': user.email,
                     'avatarColor': getattr(user, 'avatar_color', None)
                 }
-            })
+            }
+            response = JsonResponse(resp_data)
+
+            # Debug: print session key and Set-Cookie headers so developer can inspect whether cookie is set
+            try:
+                print(f"DEBUG login: session_key={request.session.session_key}")
+                print(f"DEBUG login: response.cookies={response.cookies.output()}")
+            except Exception:
+                pass
+
+            return response
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
         

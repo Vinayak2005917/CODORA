@@ -15,6 +15,8 @@ from __future__ import annotations
 import functools
 from django.http import JsonResponse
 from codora_backend.supabase_client import supabase
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 try:
     # some versions of supabase-py expose exceptions here
@@ -91,6 +93,19 @@ class SupabaseAuthMiddleware:
         try:
             user = get_user_from_token(token) if token else None
             request.supabase_user = user
+            # If we have a supabase_user, try to map to a local Django user and set request.user
+            if user and isinstance(user, dict):
+                # Prefer using the email local-part as username if present
+                email = user.get('email')
+                if email:
+                    username = email.split('@')[0]
+                    try:
+                        local_user = User.objects.filter(username=username).first()
+                        if local_user:
+                            request.user = local_user
+                    except Exception:
+                        # If mapping fails, leave request.user untouched
+                        pass
         except Exception:
             request.supabase_user = None
         return self.get_response(request)
