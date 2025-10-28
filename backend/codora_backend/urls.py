@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from core import views
+from core import supabase_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -40,4 +41,9 @@ urlpatterns = [
     path('api/projects/<str:room>/versions/', views.list_versions_view, name='list_versions'),
     path('api/projects/<str:room>/versions/<str:version_id>/', views.get_version_view, name='get_version'),
     path('api/projects/<str:room>/ai_prompt_commit/', views.ai_prompt_commit, name='ai_prompt_commit'),
+
+    # Supabase-backed endpoints (verify tokens, upload/list files)
+    path('api/supabase/upload/', supabase_views.upload_file, name='supabase_upload'),
+    path('api/supabase/list/', supabase_views.list_files, name='supabase_list'),
+    path('api/supabase/me/', supabase_views.get_user_info, name='supabase_me'),
 ]
