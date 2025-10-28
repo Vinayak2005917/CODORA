@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from django.db import IntegrityError
 import os
 load_dotenv()
+from codora_backend.supabase_client import supabase
 
 try:
     # optional dependency: markdown_pdf
@@ -46,46 +47,64 @@ def signup_view(request):
     try:
         data = json.loads(request.body)
         username = data.get('username', '').strip()
-        email = data.get('email', '').strip()
+        # Keep backward-compatible support for email field, otherwise derive one
+        email = data.get('email', '').strip() or f"{username}@codora.local"
         password = data.get('password', '').strip()
-        
+
         # Validation
         if not username or len(username) < 3:
             return JsonResponse({'error': 'Username must be at least 3 characters'}, status=400)
-        
+
         if not email:
             return JsonResponse({'error': 'Email is required'}, status=400)
-        
+
         if not password or len(password) < 6:
             return JsonResponse({'error': 'Password must be at least 6 characters'}, status=400)
-        
-        # Check if username already exists
-        if User.objects.filter(username=username).exists():
-            return JsonResponse({'error': 'Username already taken'}, status=400)
-        
-        # Check if email already exists
-        if User.objects.filter(email=email).exists():
-            return JsonResponse({'error': 'Email already registered'}, status=400)
-        
-        # Create user
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password
-        )
-        
-        # Log the user in
-        login(request, user)
-        
-        return JsonResponse({
-            'ok': True,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'avatarColor': user.avatar_color
-            }
-        })
+
+        # Use Supabase to create the auth user
+        try:
+            # supabase.auth.sign_up returns a dict-like object depending on client version
+            resp = supabase.auth.sign_up({ 'email': email, 'password': password })
+            # Check for error in response
+            # Many supabase-py versions either return {'data': {...}, 'error': ...} or an object with .error
+            error = None
+            try:
+                error = resp.get('error') if isinstance(resp, dict) else getattr(resp, 'error', None)
+            except Exception:
+                error = None
+
+            if error:
+                return JsonResponse({'error': str(error)}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Supabase signup failed: {str(e)}'}, status=500)
+
+        # Create or get a corresponding local Django user
+        try:
+            user, created = User.objects.get_or_create(username=username, defaults={ 'email': email })
+            if created:
+                # If using custom create_user behavior, ensure password not stored locally (we rely on Supabase),
+                # but Django's create_user hashes a password; to avoid storing an alternate password, set unusable.
+                user.set_unusable_password()
+                # Assign a default avatar color
+                import random
+                colors = ['#5eb3f6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899']
+                user.avatar_color = random.choice(colors)
+                user.save()
+
+            # Log the user in via Django session
+            login(request, user)
+
+            return JsonResponse({
+                'ok': True,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'avatarColor': getattr(user, 'avatar_color', None)
+                }
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
         
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -107,58 +126,58 @@ def login_view(request):
         data = json.loads(request.body)
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
-        
+
         if not username or not password:
             return JsonResponse({'error': 'Username and password are required'}, status=400)
-        
+
         if len(username) < 3:
             return JsonResponse({'error': 'Username must be at least 3 characters'}, status=400)
-        
+
         if len(password) < 6:
             return JsonResponse({'error': 'Password must be at least 6 characters'}, status=400)
-        
-        # Try to authenticate existing user
-        user = authenticate(request, username=username, password=password)
-        created = False
-        
-        if user is None:
-            # User doesn't exist or wrong password - check if user exists
-            if User.objects.filter(username=username).exists():
-                return JsonResponse({'error': 'Invalid password'}, status=401)
-            
-            # User doesn't exist - auto-register
+
+        # Convert username to email (keeps existing frontend UX)
+        email = f"{username}@codora.local"
+
+        # Authenticate via Supabase
+        try:
+            resp = supabase.auth.sign_in_with_password({'email': email, 'password': password})
+            # Check for error
+            error = None
             try:
+                error = resp.get('error') if isinstance(resp, dict) else getattr(resp, 'error', None)
+            except Exception:
+                error = None
+
+            if error:
+                return JsonResponse({'error': str(error)}, status=401)
+        except Exception as e:
+            return JsonResponse({'error': f'Supabase login failed: {str(e)}'}, status=500)
+
+        # At this point Supabase accepted the credentials. Ensure a local Django user exists and log them in.
+        try:
+            user, created = User.objects.get_or_create(username=username, defaults={'email': email})
+            if created:
+                user.set_unusable_password()
                 import random
-                user = User.objects.create_user(
-                    username=username,
-                    email=f"{username}@codora.local",  # Auto-generate email
-                    password=password
-                )
-                # Assign random avatar color
                 colors = ['#5eb3f6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899']
                 user.avatar_color = random.choice(colors)
                 user.save()
-                created = True
-            except IntegrityError:  # Handle UNIQUE constraint violations
-                # If creation fails due to duplicate (e.g., race condition), try authenticating again
-                user = authenticate(request, username=username, password=password)
-                if user is None:
-                    return JsonResponse({'error': 'Username already exists or invalid credentials'}, status=400)
-                created = False  # Existing user
-        
-        # Log the user in
-        login(request, user)
-        
-        return JsonResponse({
-            'ok': True,
-            'created': created,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'avatarColor': user.avatar_color
-            }
-        })
+
+            login(request, user)
+
+            return JsonResponse({
+                'ok': True,
+                'created': created,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'avatarColor': getattr(user, 'avatar_color', None)
+                }
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
         
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)

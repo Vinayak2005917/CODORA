@@ -48,9 +48,7 @@
         </div>
     </div>
 
-    <script type="module">
-        import { supabase } from '../supabaseClient.js';
-
+    <script>
         const local_endpoint = 'http://127.0.0.1:8000';
         const production_endpoint = 'https://codora-vk5z.onrender.com';
         const current_endpoint = production_endpoint;
@@ -75,17 +73,16 @@
             successMessage.style.display = 'none';
         }
 
-        // Convert username to an email (keeps existing UX). If you'd prefer to ask for email, update the form.
-        function usernameToEmail(username) {
-            return `${username}@codora.local`;
-        }
-
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideMessages();
 
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
+
+            console.log('=== Login form submitted ===');
+            console.log('Username:', username);
+            console.log('Password length:', password.length);
 
             if (username.length < 3) {
                 showError('Username must be at least 3 characters');
@@ -101,52 +98,36 @@
             submitButton.disabled = true;
             submitButton.textContent = 'Signing in...';
 
-            const email = usernameToEmail(username);
-
             try {
-                // Try sign in first
-                let { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-                if (error) {
-                    // If user not found, attempt sign up (auto-register behavior)
-                    console.warn('Sign in error:', error.message || error);
-                    const signup = await supabase.auth.signUp({ email, password });
-                    if (signup.error) {
-                        throw signup.error;
-                    }
-                    data = signup.data;
-                }
-
-                // Get session and token
-                const sessionResp = await supabase.auth.getSession();
-                const session = sessionResp?.data?.session || data?.session || null;
-                const token = session?.access_token;
-
-                if (!token) {
-                    throw new Error('Failed to retrieve session token from Supabase');
-                }
-
-                // Optionally send token to backend for verification/creation
-                const verifyResp = await fetch(`${current_endpoint}/api/supabase/me/`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                console.log('Sending login request to backend...');
+                const response = await fetch(`${current_endpoint}/api/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
                 });
 
-                const verifyJson = await verifyResp.json();
-                if (!verifyResp.ok || !verifyJson.ok) {
-                    console.warn('Backend verification failed:', verifyJson);
-                    showError(verifyJson.error || 'Failed to verify with backend');
-                    return;
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (response.ok && data.ok) {
+                    // Clear any cached guest session immediately
+                    sessionStorage.clear();
+                    
+                    console.log('Login successful! Redirecting immediately...');
+                    
+                    // Redirect immediately using replace to prevent back button issues
+                    window.location.replace('../dashboard/dashboard.html');
+                } else {
+                    console.error('Login failed:', data.error);
+                    showError(data.error || 'Login failed');
                 }
-
-                // Persist token in sessionStorage so subsequent requests can include it
-                sessionStorage.setItem('supabase_token', token);
-
-                // Redirect to dashboard
-                window.location.replace('../dashboard/dashboard.html');
-            } catch (err) {
-                console.error('Auth error:', err);
-                showError(err.message || String(err));
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Network error. Please try again.');
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = 'Sign in';
