@@ -139,7 +139,9 @@ def login_view(request):
         # Convert username to email (keeps existing frontend UX)
         email = f"{username}@codora.local"
 
-        # Authenticate via Supabase
+        # Authenticate via Supabase. If sign-in fails because the user doesn't exist,
+        # attempt to create the user (auto-register behavior) so the UX "enter username/password to create" continues to work.
+        created = False
         try:
             resp = supabase.auth.sign_in_with_password({'email': email, 'password': password})
             # Check for error
@@ -150,7 +152,22 @@ def login_view(request):
                 error = None
 
             if error:
-                return JsonResponse({'error': str(error)}, status=401)
+                # Try to sign up the user (auto-register)
+                try:
+                    signup_resp = supabase.auth.sign_up({'email': email, 'password': password})
+                    signup_error = None
+                    try:
+                        signup_error = signup_resp.get('error') if isinstance(signup_resp, dict) else getattr(signup_resp, 'error', None)
+                    except Exception:
+                        signup_error = None
+
+                    if signup_error:
+                        # If signup fails because the email is already registered, treat it as invalid credentials.
+                        return JsonResponse({'error': str(signup_error)}, status=401)
+                    else:
+                        created = True
+                except Exception as e:
+                    return JsonResponse({'error': f'Supabase login/signup failed: {str(e)}'}, status=500)
         except Exception as e:
             return JsonResponse({'error': f'Supabase login failed: {str(e)}'}, status=500)
 
