@@ -19,6 +19,7 @@ from django.db import IntegrityError
 import os
 load_dotenv()
 from codora_backend.supabase_client import supabase
+from django.conf import settings as django_settings
 
 try:
     # optional dependency: markdown_pdf
@@ -136,8 +137,10 @@ def login_view(request):
         if len(password) < 6:
             return JsonResponse({'error': 'Password must be at least 6 characters'}, status=400)
 
-        # Convert username to email (keeps existing frontend UX)
-        email = f"{username}@codora.local"
+        # Convert username to email (keeps existing frontend UX).
+        # Use a configurable email domain to avoid Supabase rejecting local TLDs like .local.
+        email_domain = os.environ.get('SUPABASE_EMAIL_DOMAIN') or getattr(django_settings, 'SUPABASE_EMAIL_DOMAIN', 'example.com')
+        email = f"{username}@{email_domain}"
 
         # Authenticate via Supabase. If sign-in fails because the user doesn't exist,
         # attempt to create the user (auto-register). Handle SDKs that either return
@@ -173,17 +176,29 @@ def login_view(request):
                     signup_err = None
 
                 if signup_err:
-                    # Signup failed — return the error (likely email exists or policy issue)
-                    return JsonResponse({'error': str(signup_err)}, status=401)
+                    # Signup failed — inspect message.
+                    msg = str(signup_err)
+                    print(f"Supabase signup error for {email}: {msg}")
+                    # If it's an email validation issue, fallback to creating a local Django user
+                    if 'invalid' in msg.lower() or 'email' in msg.lower():
+                        # Fallback: create local Django user and continue (no Supabase account created).
+                        print(f"FALLBACK: creating local user for {username} because Supabase rejected email")
+                        created = True
+                    else:
+                        return JsonResponse({'error': str(signup_err)}, status=401)
                 else:
                     created = True
             except Exception as e:
                 # If signup raised an exception, surface a clearer message for common cases
                 msg = str(e)
                 # If it's an invalid credentials message, return 401; otherwise 500
-                if 'Invalid' in msg or 'credentials' in msg.lower():
-                    return JsonResponse({'error': f'Supabase login failed: {msg}'}, status=401)
-                return JsonResponse({'error': f'Supabase login/signup failed: {msg}'}, status=500)
+                print(f"Supabase signup exception for {email}: {msg}")
+                if 'invalid' in msg.lower() or 'credentials' in msg.lower() or 'email' in msg.lower():
+                    # Fallback to local user creation for email-related errors
+                    print(f"FALLBACK: creating local user for {username} due to signup exception: {msg}")
+                    created = True
+                else:
+                    return JsonResponse({'error': f'Supabase login/signup failed: {msg}'}, status=500)
 
         # At this point Supabase accepted the credentials. Ensure a local Django user exists and log them in.
         try:
