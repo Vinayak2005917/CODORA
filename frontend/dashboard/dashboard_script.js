@@ -22,9 +22,19 @@ async function checkAuth() {
     }
     
     try {
-        const response = await fetch(`${current_endpoint}/api/auth/me/`, {
-            credentials: 'include'
-        });
+        // If we have a Supabase token saved, prefer token-based auth (cross-origin friendly)
+        const supabaseToken = localStorage.getItem('supabase_token');
+        const headers = {};
+        const fetchOptions = {};
+        if (supabaseToken) {
+            headers['Authorization'] = `Bearer ${supabaseToken}`;
+            fetchOptions.headers = headers;
+            // Do not rely on cookies when using token-based auth
+        } else {
+            fetchOptions.credentials = 'include';
+        }
+
+        const response = await fetch(`${current_endpoint}/api/auth/me/`, fetchOptions);
         
         const data = await response.json();
         
@@ -54,10 +64,14 @@ async function checkAuth() {
 
 async function createGuestSession() {
     try {
-        const response = await fetch(`${current_endpoint}/api/auth/guest/`, {
-            method: 'POST',
-            credentials: 'include'
-        });
+        const supabaseToken = localStorage.getItem('supabase_token');
+        const options = { method: 'POST' };
+        if (supabaseToken) {
+            options.headers = { 'Authorization': `Bearer ${supabaseToken}` };
+        } else {
+            options.credentials = 'include';
+        }
+        const response = await fetch(`${current_endpoint}/api/auth/guest/`, options);
         
         const data = await response.json();
         

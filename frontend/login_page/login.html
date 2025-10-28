@@ -116,9 +116,19 @@
                 if (response.ok && data.ok) {
                     // Clear any cached guest session immediately
                     sessionStorage.clear();
-                    
+
+                    // If Supabase returned a token, store it for Authorization-based requests
+                    if (data.supabase_backed && data.supabase_token) {
+                        try {
+                            localStorage.setItem('supabase_token', data.supabase_token);
+                            console.log('Stored supabase_token in localStorage');
+                        } catch (e) {
+                            console.warn('Failed to store supabase_token:', e);
+                        }
+                    }
+
                     console.log('Login successful! Redirecting immediately...');
-                    
+
                     // Redirect immediately using replace to prevent back button issues
                     window.location.replace('../dashboard/dashboard.html');
                 } else {
