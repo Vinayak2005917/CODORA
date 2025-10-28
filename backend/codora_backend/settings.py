@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -173,7 +174,19 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Optionally set FRONTEND_ORIGIN in environment for deployed frontends (example: https://codora-eight.vercel.app)
-FRONTEND_ORIGIN = os.getenv('FRONTEND_ORIGIN')
+_raw_frontend_origin = os.getenv('FRONTEND_ORIGIN')
+# Normalize frontend origin: ensure it includes a scheme (required by Django settings)
+FRONTEND_ORIGIN = None
+if _raw_frontend_origin:
+    parsed = urlparse(_raw_frontend_origin)
+    if not parsed.scheme:
+        # Default to https if scheme missing (most deployed frontends use HTTPS)
+        normalized = f"https://{_raw_frontend_origin.rstrip('/')}"
+    else:
+        normalized = _raw_frontend_origin.rstrip('/')
+
+    FRONTEND_ORIGIN = normalized
+
 if FRONTEND_ORIGIN:
     # In production, do not use wildcard origins when credentials are required.
     CORS_ALLOW_ALL_ORIGINS = False
