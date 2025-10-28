@@ -140,36 +140,50 @@ def login_view(request):
         email = f"{username}@codora.local"
 
         # Authenticate via Supabase. If sign-in fails because the user doesn't exist,
-        # attempt to create the user (auto-register behavior) so the UX "enter username/password to create" continues to work.
+        # attempt to create the user (auto-register). Handle SDKs that either return
+        # an error object or raise an exception with a message like "Invalid login credentials".
         created = False
+        sign_in_failed = False
+        sign_in_error_msg = None
+
         try:
             resp = supabase.auth.sign_in_with_password({'email': email, 'password': password})
-            # Check for error
-            error = None
+            # Some SDK versions return {'data':..., 'error':...}
             try:
-                error = resp.get('error') if isinstance(resp, dict) else getattr(resp, 'error', None)
+                err = resp.get('error') if isinstance(resp, dict) else getattr(resp, 'error', None)
             except Exception:
-                error = None
+                err = None
 
-            if error:
-                # Try to sign up the user (auto-register)
-                try:
-                    signup_resp = supabase.auth.sign_up({'email': email, 'password': password})
-                    signup_error = None
-                    try:
-                        signup_error = signup_resp.get('error') if isinstance(signup_resp, dict) else getattr(signup_resp, 'error', None)
-                    except Exception:
-                        signup_error = None
-
-                    if signup_error:
-                        # If signup fails because the email is already registered, treat it as invalid credentials.
-                        return JsonResponse({'error': str(signup_error)}, status=401)
-                    else:
-                        created = True
-                except Exception as e:
-                    return JsonResponse({'error': f'Supabase login/signup failed: {str(e)}'}, status=500)
+            if err:
+                sign_in_failed = True
+                sign_in_error_msg = str(err)
         except Exception as e:
-            return JsonResponse({'error': f'Supabase login failed: {str(e)}'}, status=500)
+            # SDK raised — treat as sign-in failure and inspect message
+            sign_in_failed = True
+            sign_in_error_msg = str(e)
+
+        if sign_in_failed:
+            # If sign-in failed, try to sign up (auto-register). If sign-up fails because
+            # the email already exists, return invalid credentials.
+            try:
+                signup_resp = supabase.auth.sign_up({'email': email, 'password': password})
+                try:
+                    signup_err = signup_resp.get('error') if isinstance(signup_resp, dict) else getattr(signup_resp, 'error', None)
+                except Exception:
+                    signup_err = None
+
+                if signup_err:
+                    # Signup failed — return the error (likely email exists or policy issue)
+                    return JsonResponse({'error': str(signup_err)}, status=401)
+                else:
+                    created = True
+            except Exception as e:
+                # If signup raised an exception, surface a clearer message for common cases
+                msg = str(e)
+                # If it's an invalid credentials message, return 401; otherwise 500
+                if 'Invalid' in msg or 'credentials' in msg.lower():
+                    return JsonResponse({'error': f'Supabase login failed: {msg}'}, status=401)
+                return JsonResponse({'error': f'Supabase login/signup failed: {msg}'}, status=500)
 
         # At this point Supabase accepted the credentials. Ensure a local Django user exists and log them in.
         try:
