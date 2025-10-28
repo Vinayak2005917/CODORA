@@ -309,6 +309,12 @@ def me_view(request):
     
     Response: { "ok": true, "user": { "id": 1, "username": "...", ... } } or { "ok": false }
     """
+    # Debug: print cookies received on /api/auth/me/ to verify session cookie presence
+    try:
+        print(f"DEBUG me_view: request.COOKIES={request.COOKIES}")
+    except Exception:
+        pass
+
     if request.user.is_authenticated:
         return JsonResponse({
             'ok': True,

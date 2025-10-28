@@ -30,7 +30,7 @@ load_dotenv(env_path)
 SECRET_KEY = 'django-insecure-&y81-4+g*#qxjz^2e)ispeo$78wu$r7ysqg!w!4uc6vk-q5)ez'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 
@@ -147,14 +147,17 @@ AUTH_USER_MODEL = 'core.User'
 SESSION_COOKIE_AGE = 86400 * 30  # 30 days
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_HTTPONLY = True
+# Default SameSite for cookies. For cross-site (frontend on different origin) you must set
+# SESSION_COOKIE_SAMESITE = None and SESSION_COOKIE_SECURE = True in production (HTTPS).
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 ALLOWED_HOSTS = ["*"]
 
 # CORS settings for local development
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_ALL_ORIGINS = True  # For development only; overridden below if FRONTEND_ORIGIN is set
 CORS_ALLOW_CREDENTIALS = True
 
+# Developer-friendly defaults (local dev)
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
@@ -167,5 +170,26 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5500",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
-    "https://vercel.com/vinayak2005917s-projects/codora/5eAEn5wbZv8Fr2rdEGDCGLQVgmZn",
 ]
+
+# Optionally set FRONTEND_ORIGIN in environment for deployed frontends (example: https://codora-eight.vercel.app)
+FRONTEND_ORIGIN = os.getenv('FRONTEND_ORIGIN')
+if FRONTEND_ORIGIN:
+    # In production, do not use wildcard origins when credentials are required.
+    CORS_ALLOW_ALL_ORIGINS = False
+    # Ensure credentials are allowed and the frontend origin is permitted
+    CORS_ALLOW_CREDENTIALS = True
+    # Add the frontend origin to allowed origins and CSRF trusted origins
+    if FRONTEND_ORIGIN not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(FRONTEND_ORIGIN)
+    if FRONTEND_ORIGIN not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(FRONTEND_ORIGIN)
+
+    # For cross-site cookies to be accepted, cookies must be marked SameSite=None and Secure.
+    # Only enable these settings when DEBUG is False (production) to avoid local dev HTTPS issues.
+    if not DEBUG:
+        SESSION_COOKIE_SAMESITE = None
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        # Optionally set SESSION_COOKIE_DOMAIN if you need to scope cookies to a particular domain.
+        # SESSION_COOKIE_DOMAIN = '.your-domain.com'
