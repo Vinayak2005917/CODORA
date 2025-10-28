@@ -276,6 +276,19 @@ def login_view(request):
             try:
                 print(f"DEBUG login: session_key={request.session.session_key}")
                 print(f"DEBUG login: response.cookies={response.cookies.output()}")
+                # If middleware didn't add a Set-Cookie header for some reason, set it manually
+                if not response.cookies.output():
+                    try:
+                        cookie_name = getattr(settings, 'SESSION_COOKIE_NAME', 'sessionid')
+                        cookie_value = request.session.session_key
+                        max_age = getattr(settings, 'SESSION_COOKIE_AGE', None)
+                        secure = getattr(settings, 'SESSION_COOKIE_SECURE', False)
+                        httponly = getattr(settings, 'SESSION_COOKIE_HTTPONLY', True)
+                        samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', None)
+                        response.set_cookie(cookie_name, cookie_value, max_age=max_age, secure=secure, httponly=httponly, samesite=samesite)
+                        print(f"DEBUG login: Manually set cookie {cookie_name} on response (samesite={samesite}, secure={secure})")
+                    except Exception as e:
+                        print(f"DEBUG login: Failed to set cookie manually: {e}")
             except Exception:
                 pass
 
