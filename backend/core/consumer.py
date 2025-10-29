@@ -355,7 +355,21 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 print('delete_version error:', e)
 
             if deleted:
+                # Broadcast the deletion to the whole room so every client can react immediately
+                try:
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'version.deleted',
+                            'version_id': version_id,
+                        }
+                    )
+                except Exception as e:
+                    print('Error broadcasting version_deleted event to group:', e)
+
+                # Also send confirmation to the requesting client
                 await self.send(text_data=json.dumps({'type': 'version_deleted', 'version_id': version_id, 'ok': True}))
+
                 # broadcast updated versions list
                 try:
                     versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
@@ -508,3 +522,14 @@ class EditorConsumer(AsyncWebsocketConsumer):
             'type': 'versions_list',
             'versions': event.get('versions', [])
         }))
+
+    async def version_deleted(self, event):
+        """Forward a version_deleted group event to clients so they can update UI."""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'version_deleted',
+                'version_id': event.get('version_id'),
+                'ok': True
+            }))
+        except Exception as e:
+            print('version_deleted handler error:', e)

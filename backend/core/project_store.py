@@ -321,16 +321,27 @@ class ProjectStore:
         """Delete a version file. Returns True if deleted, False otherwise."""
         versions_path = self.get_project_path(room) / 'versions'
         if not versions_path.exists():
+            print(f"delete_version: versions directory does not exist: {versions_path}")
             return False
 
         vfile = versions_path / (version_id + '.json')
         if not vfile.exists():
+            print(f"delete_version: file not found: {vfile}")
             return False
 
         try:
-            vfile.unlink()
-            return True
+            # Attempt to unlink the file and log any error for easier debugging
+            try:
+                vfile.unlink()
+                print(f"delete_version: deleted file: {vfile}")
+                return True
+            except Exception as e:
+                # Windows may lock files; surface the error for debugging
+                print(f"delete_version: failed to delete {vfile}: {e}")
+                return False
         except Exception:
+            # This outer except is kept as a safeguard, but inner unlink handles errors.
+            print(f"delete_version: unexpected error when deleting {vfile}")
             return False
 
 
