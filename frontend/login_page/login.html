@@ -35,9 +35,6 @@
                     <input type="password" id="password" placeholder="Password" required minlength="6">
                     <i class="bi bi-lock-fill"></i>
                 </div>
-                <div class="remember-forgot">
-                    <label><input type="checkbox" id="remember"> Remember me</label>
-                </div>
                 <div class="submit-button">
                     <button type="submit">Sign in</button>
                 </div>
@@ -48,102 +45,7 @@
         </div>
     </div>
 
-    <script>
-        const local_endpoint = 'http://127.0.0.1:8000';
-        const production_endpoint = 'https://codora-vk5z.onrender.com';
-        const current_endpoint = production_endpoint;
-        const loginForm = document.getElementById('login-form');
-        const errorMessage = document.getElementById('error-message');
-        const successMessage = document.getElementById('success-message');
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            successMessage.style.display = 'none';
-        }
-
-        function showSuccess(message) {
-            successMessage.textContent = message;
-            successMessage.style.display = 'block';
-            errorMessage.style.display = 'none';
-        }
-
-        function hideMessages() {
-            errorMessage.style.display = 'none';
-            successMessage.style.display = 'none';
-        }
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            hideMessages();
-
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-
-            console.log('=== Login form submitted ===');
-            console.log('Username:', username);
-            console.log('Password length:', password.length);
-
-            if (username.length < 3) {
-                showError('Username must be at least 3 characters');
-                return;
-            }
-
-            if (password.length < 6) {
-                showError('Password must be at least 6 characters');
-                return;
-            }
-
-            const submitButton = document.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.textContent = 'Signing in...';
-
-            try {
-                console.log('Sending login request to backend...');
-                const response = await fetch(`${current_endpoint}/api/auth/login/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({ username, password })
-                });
-
-                console.log('Response status:', response.status);
-                const data = await response.json();
-                console.log('Response data:', data);
-
-                if (response.ok && data.ok) {
-                    // Clear any cached guest session immediately
-                    sessionStorage.clear();
-
-                    // If Supabase returned a token, store it for Authorization-based requests
-                    if (data.supabase_backed && data.supabase_token) {
-                        try {
-                            localStorage.setItem('supabase_token', data.supabase_token);
-                            console.log('Stored supabase_token in localStorage');
-                        } catch (e) {
-                            console.warn('Failed to store supabase_token:', e);
-                        }
-                    }
-
-                    console.log('Login successful! Redirecting immediately...');
-
-                    // Redirect immediately using replace to prevent back button issues
-                    window.location.replace('../dashboard/dashboard.html');
-                } else {
-                    console.error('Login failed:', data.error);
-                    showError(data.error || 'Login failed');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showError('Network error. Please try again.');
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Sign in';
-            }
-        });
-    </script>
+    <script src="login.js"></script>
 </body>
 
 </html>
