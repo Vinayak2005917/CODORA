@@ -25,6 +25,10 @@ async function checkAuth() {
         const fetchOptions = { credentials: 'include' };
 
         const response = await fetch(`${current_endpoint}/api/auth/me/`, fetchOptions);
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`Auth check failed (${response.status}): ${body.slice(0, 140)}`);
+        }
         
         const data = await response.json();
         
@@ -59,6 +63,10 @@ async function createGuestSession() {
             credentials: 'include'
         };
         const response = await fetch(`${current_endpoint}/api/auth/guest/`, options);
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`Guest session failed (${response.status}): ${body.slice(0, 140)}`);
+        }
         
         const data = await response.json();
         
@@ -150,7 +158,8 @@ async function loadProjects() {
         console.log('loadProjects: fetch completed, response.ok=', response.ok, 'status=', response.status);
         
         if (!response.ok) {
-            console.error('Failed to load projects');
+            const body = await response.text();
+            console.error('Failed to load projects:', body.slice(0, 140));
             return;
         }
         

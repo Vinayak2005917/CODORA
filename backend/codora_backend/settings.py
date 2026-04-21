@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -22,9 +23,25 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def env_host(name: str, default: str = "") -> str:
+    raw = os.getenv(name, default).strip().rstrip("/")
+    if not raw:
+        return ""
+
+    # Supports either full origins (https://example.com) or bare hostnames.
+    if "://" in raw:
+        parsed = urlparse(raw)
+        return parsed.hostname or ""
+    return raw.split(":")[0]
+
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,.onrender.com")
+
+render_host = env_host("RENDER_EXTERNAL_HOSTNAME")
+if render_host and render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_host)
 
 ASGI_APPLICATION = "codora_backend.asgi.application"
 WSGI_APPLICATION = "codora_backend.wsgi.application"
