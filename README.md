@@ -1,7 +1,14 @@
-# CODORA
+<p>
+  <img src="./frontend/Codoro_logo.png" alt="CODORA Logo" width="50" style="vertical-align: middle; margin-right: 2px;"/>
+  <span style="font-size: 2em; font-weight: 700; vertical-align: middle;">CODORA</span>
+</p>
 
 CODORA is a collaborative AI workspace for writing documents and generating code.
 It includes a Django backend and a static frontend with pages for login, dashboard, document editing, and code editing.
+
+<p align="center">
+  <img src="./Previews/codora_dashboard_page.png" alt="CODORA Dashboard" width="500"/>
+</p>
 
 ## Project Structure
 
@@ -28,14 +35,14 @@ python manage.py runserver
 
 ## Preview
 
-### Dashboard
-
-![CODORA Dashboard](./Previews/codora_dashboard_page.png)
-
 ### Document Editing
 
-![Document Editing](./Previews/document_editing_page.png)
+<p align="center">
+  <img src="./Previews/codora_dashboard_page.png" alt="CODORA Dashboard" width="500"/>
+</p>
 
 ### Code Generation
 
-![Code Generation](./Previews/code_generation_page.png)
+<p align="center">
+  <img src="./Previews/codora_dashboard_page.png" alt="CODORA Dashboard" width="500"/>
+</p>
