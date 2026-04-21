@@ -1,18 +1,25 @@
 # Python
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+
+# Environments
 .env
+.env.*
+backend/.env
 .venv/
+venv/
+**/.venv/
 
 # Django
 *.log
-staticfiles/
-media/
+backend/staticfiles/
+backend/media/
 
 # SQLite
 *.sqlite3
+backend/db.sqlite3
 
 # VS Code
 .vscode/

@@ -2,10 +2,10 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 import aiofiles
-from pathlib import Path
 from asgiref.sync import sync_to_async
 import uuid
 from datetime import datetime
+from .project_store import project_store
 
 
 class EditorConsumer(AsyncWebsocketConsumer):
@@ -35,8 +35,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
     # In-memory per-room users tracking (dict: room -> dict[channel_name -> user_info])
     room_users = {}
     # In-memory per-room chat history cache
-    room_chat = {}
-    # In-memory per-room chat history cache (dict: room -> list[message objects])
     room_chat = {}
 
     async def connect(self):
@@ -180,8 +178,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
                 "users": users_in_room
             }
         )
-        # Debug connect
-        print(f"[WS CONNECT] channel={self.channel_name} room={self.room} user={self.user_info.get('username')}")
 
     async def disconnect(self, close_code):
         # Remove user from room tracking
@@ -202,7 +198,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
             )
         
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-        print(f"[WS DISCONNECT] channel={self.channel_name} room={self.room} code={close_code}")
 
     async def receive(self, text_data=None, bytes_data=None):
         if text_data is None:
@@ -320,7 +315,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
             content = data.get('content', self.room_content_cache.get(self.room, ''))
 
             try:
-                version = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.save_version)(self.room, content, message, author)
+                version = await sync_to_async(project_store.save_version)(self.room, content, message, author)
             except Exception as e:
                 version = None
                 print('Commit error:', e)
@@ -331,7 +326,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
                 # Broadcast updated versions list to the room
                 try:
-                    versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                    versions = await sync_to_async(project_store.list_versions)(self.room)
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -349,7 +344,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
         if msg_type == 'delete_version':
             version_id = data.get('version_id')
             try:
-                deleted = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.delete_version)(self.room, version_id)
+                deleted = await sync_to_async(project_store.delete_version)(self.room, version_id)
             except Exception as e:
                 deleted = False
                 print('delete_version error:', e)
@@ -372,7 +367,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
                 # broadcast updated versions list
                 try:
-                    versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                    versions = await sync_to_async(project_store.list_versions)(self.room)
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -389,7 +384,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
         if msg_type == 'list_versions':
             try:
-                versions = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.list_versions)(self.room)
+                versions = await sync_to_async(project_store.list_versions)(self.room)
                 await self.send(text_data=json.dumps({'type': 'versions_list', 'versions': versions or []}))
             except Exception as e:
                 print('list_versions error:', e)
@@ -399,7 +394,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
         if msg_type == 'get_version':
             version_id = data.get('version_id')
             try:
-                v = await sync_to_async(__import__('core.project_store', fromlist=['project_store']).project_store.get_version)(self.room, version_id)
+                v = await sync_to_async(project_store.get_version)(self.room, version_id)
                 await self.send(text_data=json.dumps({'type': 'version_data', 'version': v}))
             except Exception as e:
                 print('get_version error:', e)
@@ -417,8 +412,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
             message = data.get('message') or data.get('text') or ''
             timestamp = data.get('timestamp') or datetime.utcnow().isoformat()
-
-            print(f"[CHAT RECEIVE] room={self.room} channel={self.channel_name} username={username} message={message}")
 
             # Build canonical message object and append to in-memory history
             msg_obj = {
@@ -457,7 +450,6 @@ class EditorConsumer(AsyncWebsocketConsumer):
                     'sender_channel': self.channel_name,
                 }
             )
-            print(f"[CHAT BROADCAST] room={self.room} from={self.channel_name} id={msg_obj['id']}")
             return
 
         # Ignore unknown message types
