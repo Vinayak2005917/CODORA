@@ -1,0 +1,1 @@
+web: DJANGO_SETTINGS_MODULE=codora_backend.settings daphne -b 0.0.0.0 -p ${PORT:-10000} codora_backend.asgi:application

@@ -324,5 +324,12 @@ class ProjectStore:
             return False
 
 
-# Singleton instance
-project_store = ProjectStore()
+_project_store = None
+
+
+def get_project_store() -> ProjectStore:
+    """Return a lazily initialized ProjectStore instance."""
+    global _project_store
+    if _project_store is None:
+        _project_store = ProjectStore()
+    return _project_store

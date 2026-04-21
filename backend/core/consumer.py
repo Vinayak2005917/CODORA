@@ -5,7 +5,7 @@ import aiofiles
 from asgiref.sync import sync_to_async
 import uuid
 from datetime import datetime
-from .project_store import project_store
+from .project_store import get_project_store
 
 
 class EditorConsumer(AsyncWebsocketConsumer):
@@ -36,6 +36,10 @@ class EditorConsumer(AsyncWebsocketConsumer):
     room_users = {}
     # In-memory per-room chat history cache
     room_chat = {}
+
+    @staticmethod
+    def _store():
+        return get_project_store()
 
     async def connect(self):
         # Extract room from URL path (defaults to "default" for backward compatibility)
@@ -315,7 +319,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
             content = data.get('content', self.room_content_cache.get(self.room, ''))
 
             try:
-                version = await sync_to_async(project_store.save_version)(self.room, content, message, author)
+                version = await sync_to_async(self._store().save_version)(self.room, content, message, author)
             except Exception as e:
                 version = None
                 print('Commit error:', e)
@@ -326,7 +330,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
                 # Broadcast updated versions list to the room
                 try:
-                    versions = await sync_to_async(project_store.list_versions)(self.room)
+                    versions = await sync_to_async(self._store().list_versions)(self.room)
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -344,7 +348,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
         if msg_type == 'delete_version':
             version_id = data.get('version_id')
             try:
-                deleted = await sync_to_async(project_store.delete_version)(self.room, version_id)
+                deleted = await sync_to_async(self._store().delete_version)(self.room, version_id)
             except Exception as e:
                 deleted = False
                 print('delete_version error:', e)
@@ -367,7 +371,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
                 # broadcast updated versions list
                 try:
-                    versions = await sync_to_async(project_store.list_versions)(self.room)
+                    versions = await sync_to_async(self._store().list_versions)(self.room)
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -384,7 +388,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
 
         if msg_type == 'list_versions':
             try:
-                versions = await sync_to_async(project_store.list_versions)(self.room)
+                versions = await sync_to_async(self._store().list_versions)(self.room)
                 await self.send(text_data=json.dumps({'type': 'versions_list', 'versions': versions or []}))
             except Exception as e:
                 print('list_versions error:', e)
@@ -394,7 +398,7 @@ class EditorConsumer(AsyncWebsocketConsumer):
         if msg_type == 'get_version':
             version_id = data.get('version_id')
             try:
-                v = await sync_to_async(project_store.get_version)(self.room, version_id)
+                v = await sync_to_async(self._store().get_version)(self.room, version_id)
                 await self.send(text_data=json.dumps({'type': 'version_data', 'version': v}))
             except Exception as e:
                 print('get_version error:', e)

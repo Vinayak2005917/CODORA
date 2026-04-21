@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from openai import OpenAI
 
 from .models import User
-from .project_store import project_store
+from .project_store import get_project_store
 
 try:
     from markdown_pdf import MarkdownPdf, Section
@@ -25,6 +25,8 @@ except Exception:
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-nano-9b-v2:free")
+OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://codora.app")
+OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "CODORA")
 DEFAULT_AVATAR_COLORS = ["#5eb3f6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#EC4899"]
 
 
@@ -69,8 +71,8 @@ def _ask_ai(system_prompt, user_prompt):
 
     completion = client.chat.completions.create(
         extra_headers={
-            "HTTP-Referer": "https://codora.app",
-            "X-Title": "CODORA",
+            "HTTP-Referer": OPENROUTER_SITE_URL,
+            "X-Title": OPENROUTER_APP_NAME,
         },
         model=OPENROUTER_MODEL,
         messages=[
@@ -79,6 +81,10 @@ def _ask_ai(system_prompt, user_prompt):
         ],
     )
     return completion.choices[0].message.content
+
+
+def _store():
+    return get_project_store()
 
 
 @csrf_exempt
@@ -269,7 +275,7 @@ def create_project(request):
     except Exception as exc:
         return JsonResponse({"error": f"AI Error: {str(exc)}"}, status=500)
 
-    project = project_store.create_project(project_type=project_type, prompt=prompt, content=ai_response)
+    project = _store().create_project(project_type=project_type, prompt=prompt, content=ai_response)
 
     editor_map = {
         "doc": "/frontend/doc_editor/doc_editor.html",
@@ -320,7 +326,7 @@ def ai_prompt_commit(request, room):
     if not prompt:
         return JsonResponse({"error": "Prompt is required"}, status=400)
 
-    project = project_store.get_project(room)
+    project = _store().get_project(room)
     if not project:
         return JsonResponse({"error": f"Project {room} not found"}, status=404)
 
@@ -337,7 +343,7 @@ def ai_prompt_commit(request, room):
     except Exception as exc:
         return JsonResponse({"error": f"AI Error: {str(exc)}"}, status=500)
 
-    version = project_store.save_version(room, ai_response, message=f"AI: {prompt[:60]}", author="AI")
+    version = _store().save_version(room, ai_response, message=f"AI: {prompt[:60]}", author="AI")
 
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
@@ -349,7 +355,7 @@ def ai_prompt_commit(request, room):
         },
     )
 
-    versions = project_store.list_versions(room) or []
+    versions = _store().list_versions(room) or []
     async_to_sync(channel_layer.group_send)(
         f"editor_{room}",
         {
@@ -363,7 +369,7 @@ def ai_prompt_commit(request, room):
 
 @require_http_methods(["GET"])
 def list_projects(request):
-    projects = project_store.list_projects()
+    projects = _store().list_projects()
     response_projects = [
         {
             "room": project["room"],
@@ -380,7 +386,7 @@ def list_projects(request):
 
 @require_http_methods(["GET"])
 def get_project(request, room):
-    project = project_store.get_project(room)
+    project = _store().get_project(room)
     if not project:
         return JsonResponse({"error": "Project not found"}, status=404)
 
@@ -400,14 +406,14 @@ def get_project(request, room):
 
 @require_http_methods(["DELETE"])
 def delete_project(request, room):
-    if not project_store.delete_project(room):
+    if not _store().delete_project(room):
         return JsonResponse({"error": "Project not found or could not be deleted"}, status=404)
     return JsonResponse({"ok": True})
 
 
 @require_http_methods(["GET"])
 def download_project_pdf(request, room):
-    project = project_store.get_project(room)
+    project = _store().get_project(room)
     if not project:
         return JsonResponse({"error": "Project not found"}, status=404)
 
@@ -432,7 +438,7 @@ def download_project_pdf(request, room):
 @csrf_exempt
 @require_http_methods(["POST"])
 def commit_version(request, room):
-    project = project_store.get_project(room)
+    project = _store().get_project(room)
     if not project:
         return JsonResponse({"error": "Project not found"}, status=404)
 
@@ -442,7 +448,7 @@ def commit_version(request, room):
 
     message = data.get("message", "").strip() or "Snapshot"
     author = data.get("author", "User")
-    version = project_store.save_version(room, project.get("content", ""), message, author)
+    version = _store().save_version(room, project.get("content", ""), message, author)
     if not version:
         return JsonResponse({"error": "Failed to save version"}, status=500)
     return JsonResponse({"ok": True, "version": version})
@@ -450,11 +456,11 @@ def commit_version(request, room):
 
 @require_http_methods(["GET"])
 def list_versions_view(request, room):
-    project = project_store.get_project(room)
+    project = _store().get_project(room)
     if not project:
         return JsonResponse({"error": "Project not found"}, status=404)
 
-    versions = project_store.list_versions(room) or []
+    versions = _store().list_versions(room) or []
     meta = [
         {
             "id": version["id"],
@@ -469,7 +475,7 @@ def list_versions_view(request, room):
 
 @require_http_methods(["GET"])
 def get_version_view(request, room, version_id):
-    version = project_store.get_version(room, version_id)
+    version = _store().get_version(room, version_id)
     if not version:
         return JsonResponse({"error": "Version not found"}, status=404)
     return JsonResponse(version)
