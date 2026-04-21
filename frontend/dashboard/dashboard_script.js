@@ -3,9 +3,64 @@ let currentUser = null;
 const local_endpoint = 'http://127.0.0.1:8000';
 const production_endpoint = 'https://codora-vk5z.onrender.com';
 const current_endpoint = production_endpoint;
+const API_TIMEOUT_MS = 40000;
 // Defer DOM element references until after DOMContentLoaded to avoid null reference errors
 let promptInput = null;
 let goButton = null;
+
+let dashboardLoadingInterval = null;
+let dashboardLoadingDeadline = 0;
+
+function showDashboardLoading(message = 'Processing request') {
+    dashboardLoadingDeadline = Date.now() + API_TIMEOUT_MS;
+    let overlay = document.getElementById('dashboardLoadingOverlay');
+
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'dashboardLoadingOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100000;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:white;padding:20px 30px;border-radius:12px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,0.2);';
+
+        const spinner = document.createElement('div');
+        spinner.style.cssText = 'width:28px;height:28px;border-radius:50%;border:4px solid #f3f4f6;border-top-color:#3b82f6;animation:dashboardSpin 1s linear infinite';
+
+        const text = document.createElement('div');
+        text.id = 'dashboardLoadingText';
+
+        box.appendChild(spinner);
+        box.appendChild(text);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        if (!document.getElementById('dashboardLoadingStyle')) {
+            const style = document.createElement('style');
+            style.id = 'dashboardLoadingStyle';
+            style.textContent = '@keyframes dashboardSpin { to { transform: rotate(360deg) } }';
+            document.head.appendChild(style);
+        }
+    } else {
+        overlay.style.display = 'flex';
+    }
+
+    const text = document.getElementById('dashboardLoadingText');
+    const updateCountdown = () => {
+        if (!text) return;
+        const secondsLeft = Math.max(0, Math.ceil((dashboardLoadingDeadline - Date.now()) / 1000));
+        text.textContent = `${message} (${secondsLeft}s)`;
+    };
+
+    clearInterval(dashboardLoadingInterval);
+    updateCountdown();
+    dashboardLoadingInterval = setInterval(updateCountdown, 1000);
+}
+
+function hideDashboardLoading() {
+    clearInterval(dashboardLoadingInterval);
+    const overlay = document.getElementById('dashboardLoadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
 async function checkAuth() {
     // Check if we recently authenticated (within last 2 seconds)
     const lastCheck = sessionStorage.getItem('last_auth_check');
@@ -408,17 +463,25 @@ async function processPrompt() {
     promptInput.disabled = true;
     goButton.textContent = '✨ Processing...';
     goButton.style.opacity = '0.7';
+    showDashboardLoading('Generating project');
+
+    let timeoutId = null;
 
     try {
         console.log('Creating project:', { type: selectedType, prompt }); // Debug log
 
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
         const response = await fetch(`${current_endpoint}/api/projects/`, {
             method: 'POST',
+            signal: controller.signal,
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ type: selectedType, prompt: prompt })
         });
+        clearTimeout(timeoutId);
 
         console.log('Response status:', response.status); // Debug log
         console.log('Response ok:', response.ok); // Debug log
@@ -481,12 +544,19 @@ async function processPrompt() {
         }
     } catch (error) {
         console.error('Network error:', error);
-        alert('Failed to connect to backend. Make sure the server is running on ${current_endpoint}\n\nError details: ' + error.message);
+        if (error && error.name === 'AbortError') {
+            alert('Request timed out after 40 seconds. Please try a shorter prompt or retry.');
+        } else {
+            alert('Failed to connect to backend. Make sure the server is running on ${current_endpoint}\n\nError details: ' + error.message);
+        }
         // Re-enable button on error
         goButton.disabled = false;
         promptInput.disabled = false;
         goButton.textContent = 'Go!';
         goButton.style.opacity = '1';
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+        hideDashboardLoading();
     }
 }
 

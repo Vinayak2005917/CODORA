@@ -497,9 +497,13 @@ function ensureFloatingPrompt() {
   const btn = document.createElement('button');
   btn.className = 'generate-btn';
   btn.textContent = 'Generate';
+  const API_TIMEOUT_MS = 40000;
+  let loadingCountdownInterval = null;
+  let loadingDeadline = 0;
 
   // Loading overlay utilities
   function showLoading(message = 'Generating…') {
+    loadingDeadline = Date.now() + API_TIMEOUT_MS;
     let overlay = document.getElementById('aiLoadingOverlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -526,10 +530,22 @@ function ensureFloatingPrompt() {
       if (text) text.textContent = message;
       overlay.style.display = 'flex';
     }
+
+    const text = document.getElementById('aiLoadingText');
+    const updateCountdown = () => {
+      if (!text) return;
+      const secondsLeft = Math.max(0, Math.ceil((loadingDeadline - Date.now()) / 1000));
+      text.textContent = `${message} (${secondsLeft}s)`;
+    };
+
+    clearInterval(loadingCountdownInterval);
+    updateCountdown();
+    loadingCountdownInterval = setInterval(updateCountdown, 1000);
   }
 
   function hideLoading() {
     const overlay = document.getElementById('aiLoadingOverlay');
+    clearInterval(loadingCountdownInterval);
     if (overlay) overlay.style.display = 'none';
   }
 
@@ -538,7 +554,8 @@ function ensureFloatingPrompt() {
     if (!prompt) return;
 
     btn.disabled = true;
-    showLoading();
+    showLoading('Generating content');
+    let timeoutId = null;
 
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -549,12 +566,16 @@ function ensureFloatingPrompt() {
       }
 
       const endpoint = `${current_endpoint}/api/projects/${room}/ai_prompt_commit/`;
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
       const resp = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt, content: editor ? editor.innerText || editor.innerHTML : '' })
       });
+      clearTimeout(timeoutId);
 
       let data = {};
       try {
@@ -602,8 +623,13 @@ function ensureFloatingPrompt() {
 
     } catch (err) {
       console.error('AI prompt commit error', err);
-      showNotification('AI request error', 'info');
+      if (err && err.name === 'AbortError') {
+        showNotification('AI request timed out after 40 seconds', 'info');
+      } else {
+        showNotification('AI request error', 'info');
+      }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       btn.disabled = false;
       hideLoading();
     }

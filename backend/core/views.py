@@ -87,6 +87,16 @@ def _store():
     return get_project_store()
 
 
+def _strip_wrapping_code_fence(text):
+    """Remove a single outer triple-backtick block when present."""
+    if not isinstance(text, str):
+        return text
+    match = re.match(r"^\s*```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```\s*$", text)
+    if match:
+        return match.group(1).strip()
+    return text
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def signup_view(request):
@@ -218,8 +228,9 @@ def process_prompt(request):
         return JsonResponse({"error": "Prompt is required"}, status=400)
 
     system_prompt = (
-        "You are CODORA AI. For document requests, respond in clean Markdown. "
-        "For code requests, return only code and useful comments."
+        "You are CODORA AI. For document requests, return only clean markdown content "
+        "without markdown code fences, prefaces, or extra commentary. "
+        "For code requests, return only code and useful comments without markdown code fences."
     )
 
     try:
@@ -266,14 +277,26 @@ def create_project(request):
         return JsonResponse({"error": "Prompt is required"}, status=400)
 
     if project_type == "code":
-        system_prompt = "You generate clean code only, with concise comments where useful."
+        system_prompt = (
+            "You generate clean code only. "
+            "Return only the code with concise comments where useful. "
+            "Do not wrap output in markdown code fences."
+        )
     else:
-        system_prompt = "You generate clean markdown documents with readable structure."
+        system_prompt = (
+            "You generate polished markdown documents. "
+            "Return only the final markdown content. "
+            "Do not include prefaces or explanations. "
+            "Do not wrap output in markdown code fences."
+        )
 
     try:
         ai_response = _ask_ai(system_prompt, prompt)
     except Exception as exc:
         return JsonResponse({"error": f"AI Error: {str(exc)}"}, status=500)
+
+    if project_type != "code":
+        ai_response = _strip_wrapping_code_fence(ai_response)
 
     project = _store().create_project(project_type=project_type, prompt=prompt, content=ai_response)
 
@@ -331,17 +354,37 @@ def ai_prompt_commit(request, room):
         return JsonResponse({"error": f"Project {room} not found"}, status=404)
 
     if project["type"] == "code":
-        system_prompt = "You improve code and return only the updated code."
+        system_prompt = (
+            "You improve code and return only the updated code. "
+            "Do not wrap output in markdown code fences."
+        )
+        code_only = _extract_code_blocks(current_content)
+        user_message = (
+            "Current file content:\n"
+            f"{code_only}\n\n"
+            "User request:\n"
+            f"{prompt}"
+        )
     else:
-        system_prompt = "You improve documents and return polished markdown."
-
-    code_only = _extract_code_blocks(current_content)
-    user_message = f"Current file content:\n```\n{code_only}\n```\n\nUser request:\n{prompt}"
+        system_prompt = (
+            "You improve documents and return polished markdown. "
+            "Return only the markdown document content. "
+            "Do not add prefaces, explanations, or markdown code fences."
+        )
+        user_message = (
+            "Current document content:\n"
+            f"{current_content}\n\n"
+            "User request:\n"
+            f"{prompt}"
+        )
 
     try:
         ai_response = _ask_ai(system_prompt, user_message)
     except Exception as exc:
         return JsonResponse({"error": f"AI Error: {str(exc)}"}, status=500)
+
+    if project["type"] != "code":
+        ai_response = _strip_wrapping_code_fence(ai_response)
 
     version = _store().save_version(room, ai_response, message=f"AI: {prompt[:60]}", author="AI")
 
